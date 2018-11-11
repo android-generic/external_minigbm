@@ -23,10 +23,10 @@
 #include "drv_priv.h"
 #include "util.h"
 
-#ifdef __ANDROID__
-#define DRI_PATH "/vendor/lib/dri/radeonsi_dri.so"
+#ifdef __LP64__
+#define DRI_PATH "/vendor/lib64/dri/radeonsi_dri.so"
 #else
-#define DRI_PATH "/usr/lib64/dri/radeonsi_dri.so"
+#define DRI_PATH "/vendor/lib/dri/radeonsi_dri.so"
 #endif
 
 #define TILE_TYPE_LINEAR 0
