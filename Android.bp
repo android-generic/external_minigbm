@@ -73,6 +73,8 @@ filegroup {
 cc_defaults {
     name: "minigbm_defaults",
 
+    include_dirs: ["external/mesa/include"],
+
     cflags: [
         "-D_GNU_SOURCE=1",
         "-D_FILE_OFFSET_BITS=64",
