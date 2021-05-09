@@ -36,6 +36,7 @@
 #include "drm_framebuffer.h"
 
 #include "../cros_gralloc_handle.h"
+#include "../cros_gralloc_helpers.h"
 
 #define SWAP_INTERVAL 1
 
@@ -108,7 +109,7 @@ static void fb0_handle_page_flip(
 	__unused unsigned int tv_sec, __unused unsigned int tv_usec,
 	__unused void *data)
 {
-	struct drm_framebuffer *fb = data;
+	struct drm_framebuffer *fb = static_cast<drm_framebuffer *>(data);
 	fb->current_fb = fb->next_fb;
 	fb->next_fb = 0;
 }
@@ -301,7 +302,7 @@ int drm_framebuffer_init(int fd, struct drm_framebuffer **fb_out)
 	struct drm_framebuffer *fb;
 	int ret;
 
-	fb = calloc(1, sizeof(*fb));
+	fb = static_cast<drm_framebuffer *>(calloc(1, sizeof(*fb)));
 	if (!fb) {
 		return -ENOMEM;
 	}
