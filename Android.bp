@@ -66,7 +66,7 @@ filegroup {
     name: "minigbm_gralloc0_files",
     srcs: [
         "cros_gralloc/gralloc0/gralloc0.cc",
-        "cros_gralloc/gralloc0/drm_framebuffer.c",
+        "cros_gralloc/gralloc0/drm_framebuffer.cc",
     ],
 }
 
