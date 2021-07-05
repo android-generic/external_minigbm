@@ -13,16 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package {
-    // See: http://go/android-license-faq
-    // A large-scale-change added 'default_applicable_licenses' to import
-    // all of the 'license_kinds' from "external_minigbm_license"
-    // to get the below license kinds:
-    //   SPDX-license-identifier-Apache-2.0
-    //   SPDX-license-identifier-BSD
-    default_applicable_licenses: ["external_minigbm_license"],
-}
-
 filegroup {
     name: "minigbm_gralloc4_allocator_files",
     srcs: [
