@@ -10,11 +10,13 @@
 #include <cassert>
 #include <hardware/gralloc.h>
 #include <memory.h>
+#include "drm_framebuffer.h"
 
 struct gralloc0_module {
 	gralloc_module_t base;
 	std::unique_ptr<alloc_device_t> alloc;
 	cros_gralloc_driver *driver;
+	struct drm_framebuffer *fb;
 	bool initialized;
 	std::mutex initialization_mutex;
 };
@@ -111,16 +113,24 @@ static int gralloc0_close(struct hw_device_t *dev)
 	return 0;
 }
 
-static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
+static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc,
+			  bool framebuffer = false)
 {
 	std::lock_guard<std::mutex> lock(mod->initialization_mutex);
 
 	if (mod->initialized)
 		return 0;
 
-	mod->driver = cros_gralloc_driver::get_instance();
-	if (!mod->driver)
-		return -ENODEV;
+	if (framebuffer) {
+		if (mod->driver->init_master()) {
+			drv_log("Failed to initialize driver.\n");
+			return -ENODEV;
+		}
+	} else {
+		mod->driver = cros_gralloc_driver::get_instance();
+		if (!mod->driver)
+			return -ENODEV;
+	}
 
 	if (initialize_alloc) {
 		mod->alloc = std::make_unique<alloc_device_t>();
@@ -132,7 +142,47 @@ static int gralloc0_init(struct gralloc0_module *mod, bool initialize_alloc)
 		mod->alloc->common.close = gralloc0_close;
 	}
 
+	if (framebuffer) {
+		int ret = drm_framebuffer_init(mod->driver->get_fd(), &mod->fb);
+		if (ret)
+			return ret;
+	}
+
 	mod->initialized = true;
+	return 0;
+}
+
+static int gralloc0_open_fb0(struct gralloc0_module *mod, struct hw_device_t **dev)
+{
+	int ret;
+
+	if (!mod->initialized) {
+		ret = gralloc0_init(mod, true, true);
+		if (ret)
+			return ret;
+	}
+
+	if (!mod->fb) {
+		/*
+		 * On Pie and above the FB HAL is opened before the Gralloc HAL.
+		 * This has the advantage that we can open the DRM card node in this case,
+		 * and open the render node in all other cases.
+		 *
+		 * On earlier Android versions this is not the case, so we need to make
+		 * sure the FB HAL was actually initialized.
+		 *
+		 * TODO: Currently it does not attempt to set master on the opened render
+		 * node. That means it will only work with DRM authentication disabled.
+		 */
+		std::lock_guard<std::mutex> lock(mod->initialization_mutex);
+		drv_log("FB HAL opened after Gralloc HAL, we might not be DRM master!\n");
+
+		ret = drm_framebuffer_init(mod->driver->get_fd(), &mod->fb);
+		if (ret)
+			return ret;
+	}
+
+	*dev = (struct hw_device_t *) mod->fb;
 	return 0;
 }
 
@@ -140,6 +190,9 @@ static int gralloc0_open(const struct hw_module_t *mod, const char *name, struct
 {
 	auto const_module = reinterpret_cast<const struct gralloc0_module *>(mod);
 	auto module = const_cast<struct gralloc0_module *>(const_module);
+
+	if (!strcmp(name, GRALLOC_HARDWARE_FB0))
+		return gralloc0_open_fb0(module, dev);
 
 	if (module->initialized) {
 		*dev = &module->alloc->common;
@@ -168,7 +221,10 @@ static int gralloc0_register_buffer(struct gralloc_module_t const *module, buffe
 			return -ENODEV;
 	}
 
-	return mod->driver->retain(handle);
+	int ret = mod->driver->retain(handle);
+	if (ret == 0 && mod->fb)
+		drm_framebuffer_import(mod->fb, handle);
+	return ret;
 }
 
 static int gralloc0_unregister_buffer(struct gralloc_module_t const *module, buffer_handle_t handle)

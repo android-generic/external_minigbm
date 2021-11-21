@@ -64,7 +64,10 @@ filegroup {
 
 filegroup {
     name: "minigbm_gralloc0_files",
-    srcs: ["cros_gralloc/gralloc0/gralloc0.cc"],
+    srcs: [
+        "cros_gralloc/gralloc0/gralloc0.cc",
+        "cros_gralloc/gralloc0/drm_framebuffer.c",
+    ],
 }
 
 cc_defaults {
@@ -76,7 +79,6 @@ cc_defaults {
         "-Wall",
         "-Wsign-compare",
         "-Wpointer-arith",
-        "-Wcast-qual",
         "-Wcast-align",
         "-Wno-unused-parameter",
     ],

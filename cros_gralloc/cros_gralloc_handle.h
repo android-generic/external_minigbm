@@ -7,7 +7,9 @@
 #ifndef CROS_GRALLOC_HANDLE_H
 #define CROS_GRALLOC_HANDLE_H
 
+#ifdef __cplusplus
 #include <cstdint>
+#endif
 #include <cutils/native_handle.h>
 
 #define DRV_MAX_PLANES 4
@@ -44,7 +46,8 @@ struct cros_gralloc_handle : public native_handle_t {
 	 * Name is a null terminated char array located at handle->base.data[handle->name_offset].
 	 */
 	uint32_t name_offset;
-} __attribute__((packed));
+	uint32_t fb_id;
+};
 
 typedef const struct cros_gralloc_handle *cros_gralloc_handle_t;
 

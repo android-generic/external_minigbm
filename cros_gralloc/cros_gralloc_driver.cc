@@ -79,6 +79,10 @@ static struct driver *init_try_node(int idx, char const *str)
 	return drv;
 }
 
+int cros_gralloc_driver::get_fd() const {
+	return drv_get_fd(drv_);
+}
+
 cros_gralloc_driver::cros_gralloc_driver()
 {
 	/*
@@ -168,6 +172,18 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	*out_format = resolved_format;
 	*out_use_flags = resolved_use_flags;
 	return true;
+}
+
+int cros_gralloc_driver::init_master()
+{
+	int fd = open(DRM_DIR_NAME "/card0", O_RDWR, 0);
+	if (fd >= 0) {
+		drv_ = drv_create(fd);
+		if (drv_)
+			return 0;
+	}
+
+	return -ENODEV;
 }
 
 bool cros_gralloc_driver::is_supported(const struct cros_gralloc_buffer_descriptor *descriptor)
