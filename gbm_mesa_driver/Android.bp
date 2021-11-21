@@ -56,5 +56,8 @@ cc_library_shared {
 cc_library_shared {
     name: "gralloc.minigbm_gbm_mesa",
     defaults: ["minigbm_cros_gralloc0_defaults"],
-    shared_libs: ["libminigbm_gralloc_gbm_mesa"],
+    shared_libs: [
+        "libminigbm_gralloc_gbm_mesa",
+        "libminigbm_gralloc",
+    ],
 }
