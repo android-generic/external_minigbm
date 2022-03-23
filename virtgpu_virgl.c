@@ -1053,6 +1053,7 @@ static void virgl_resolve_format_and_use_flags(struct driver *drv, uint32_t form
 	}
 }
 
+__attribute__((unused))
 static int virgl_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 			       uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier)
 {
@@ -1106,5 +1107,5 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .bo_flush = virgl_bo_flush,
 				       .resolve_format_and_use_flags =
 					   virgl_resolve_format_and_use_flags,
-				       .resource_info = virgl_resource_info,
+				       .resource_info = NULL,
 				       .get_max_texture_2d_size = virgl_get_max_texture_2d_size };
