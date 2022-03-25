@@ -130,7 +130,7 @@ static struct driver *init_try_nodes()
 	return nullptr;
 }
 #else
-cros_gralloc_driver::cros_gralloc_driver()
+static struct driver *init_try_nodes()
 {
 	drv_ = drv_create(-1);
 }
