@@ -142,7 +142,9 @@ cc_defaults {
     srcs: [":minigbm_gralloc0_files"],
 }
 
-generic_cflags = ["-DHAS_DMABUF_SYSTEM_HEAP"]
+generic_cflags = ["-DHAS_DMABUF_SYSTEM_HEAP",
+                  "-DDRV_AMDGPU",
+                  "-DDRV_RADEON"]
 intel_cflags = ["-DDRV_I915"]
 meson_cflags = ["-DDRV_MESON"]
 msm_cflags = [
