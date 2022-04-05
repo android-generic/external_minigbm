@@ -132,8 +132,11 @@ static struct driver *init_try_nodes()
 #else
 static struct driver *init_try_nodes()
 {
-	drv_ = drv_create(-1);
+	struct driver *drv;	
+	drv = drv_create(-1);
+	return nullptr;
 }
+
 #endif
 
 static void drv_destroy_and_close(struct driver *drv)
