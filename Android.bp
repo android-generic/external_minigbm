@@ -178,7 +178,9 @@ cc_library {
 cc_library_shared {
     name: "libminigbm_gralloc",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: ["-DHAS_DMABUF_SYSTEM_HEAP"],
+    cflags: ["-DHAS_DMABUF_SYSTEM_HEAP", 
+             "-DDRV_AMDGPU",
+             "-DDRV_RADEON"],
 }
 
 cc_library_shared {
