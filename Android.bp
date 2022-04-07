@@ -38,6 +38,7 @@ filegroup {
     srcs: [
         "amdgpu.c",
         "backend_mock.c",
+        "dri.c",
         "drv.c",
         "drv_array_helpers.c",
         "drv_helpers.c",
@@ -80,6 +81,7 @@ cc_defaults {
         "-Wcast-qual",
         "-Wcast-align",
         "-Wno-unused-parameter",
+        "-Wno-typedef-redefinition",
     ],
 
     product_variables: {
@@ -233,6 +235,8 @@ rust_bindgen {
 cc_library_shared {
     name: "libminigbm_gralloc",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
+    include_dirs: ["external/libdrm/amdgpu",
+                    "external/mesa/include"],
     cflags: generic_cflags,
 }
 
