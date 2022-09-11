@@ -429,7 +429,10 @@ void *gbm_mesa_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map
 		s_height = 1;
 	}
 
-	gbm_map(priv->gbm_bo, s_width, s_height, &buf, &vma->priv);
+	uint32_t bytes_per_pixel = drv_bytes_per_pixel_from_format(bo->meta.format, 0);
+
+	gbm_map(priv->gbm_bo, DIV_ROUND_UP(bo->meta.strides[0], bytes_per_pixel), s_height, &buf,
+		&vma->priv);
 
 	return buf;
 }
