@@ -168,7 +168,8 @@ cc_library_shared {
                     "external/mesa/include"],
     cflags: ["-DHAS_DMABUF_SYSTEM_HEAP", 
              "-DDRV_AMDGPU",
-             "-DDRV_RADEON"],
+             "-DDRV_RADEON",
+             "-DDRV_I915"],
 }
 
 cc_library_shared {
