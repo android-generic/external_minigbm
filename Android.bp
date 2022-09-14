@@ -146,7 +146,8 @@ cc_defaults {
 
 generic_cflags = ["-DHAS_DMABUF_SYSTEM_HEAP",
                   "-DDRV_AMDGPU",
-                  "-DDRV_RADEON"]
+                  "-DDRV_RADEON", 
+                  "-DDRV_I915"]
 intel_cflags = ["-DDRV_I915"]
 meson_cflags = ["-DDRV_MESON"]
 msm_cflags = [
