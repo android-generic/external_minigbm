@@ -73,4 +73,7 @@ void lru_insert(struct lru *lru, struct lru_entry *entry);
 void lru_init(struct lru *lru, int max);
 uint32_t drv_get_inode(int dmabuf_fd);
 
+int drv_use_flags_to_string(int use_flags, char *out, int max_len);
+int drv_use_flags_to_string_short(int use_flags, char *out, int max_len);
+
 #endif
