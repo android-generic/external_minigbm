@@ -52,4 +52,7 @@ void drv_resolve_format_and_use_flags_helper(struct driver *drv, uint32_t format
 
 uint32_t drv_get_inode(int dmabuf_fd);
 
+int drv_use_flags_to_string(int use_flags, char *out, int max_len);
+int drv_use_flags_to_string_short(int use_flags, char *out, int max_len);
+
 #endif
