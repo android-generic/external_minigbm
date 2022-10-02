@@ -71,5 +71,6 @@ struct lru_entry *lru_find(struct lru *lru, bool (*eq)(struct lru_entry *e, void
 			   void *data);
 void lru_insert(struct lru *lru, struct lru_entry *entry);
 void lru_init(struct lru *lru, int max);
+uint32_t drv_get_inode(int dmabuf_fd);
 
 #endif
