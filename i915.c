@@ -23,6 +23,12 @@
 #define I915_CACHELINE_SIZE 64
 #define I915_CACHELINE_MASK (I915_CACHELINE_SIZE - 1)
 
+/* Allow NV12 to be used with scanout usage, to support stagefright-plugins
+ * buffer allocation. If the GPU does not support it, HWC will mark the buffer
+ * as client-composed and it'll be handled by SurfaceFlinger/libEGL.
+ */
+#define I915_SCANOUT_Y_TILED
+
 static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR8888,
 						   DRM_FORMAT_ARGB2101010, DRM_FORMAT_ARGB8888,
 						   DRM_FORMAT_RGB565,	   DRM_FORMAT_XBGR2101010,
@@ -761,6 +767,15 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
 		gem_set_tiling.stride = bo->meta.strides[0];
 
+        /* Mesa/crocus driver has trouble dealing with Y-tiled buffer with tiling set in
+         * the kernel as well as in metadata. A (hopefully) temporary hack is not to set
+         * tiling in the kernel.
+         *
+         * Ref: https://gitlab.freedesktop.org/mesa/mesa/-/issues/7469
+         */
+	if (gem_set_tiling.tiling_mode == I915_TILING_Y) {
+	    gem_set_tiling.tiling_mode = I915_TILING_NONE;
+	}
 		ret = drmIoctl(bo->drv->fd, DRM_IOCTL_I915_GEM_SET_TILING, &gem_set_tiling);
 		if (ret) {
 			struct drm_gem_close gem_close = { 0 };
