@@ -128,7 +128,7 @@ cc_defaults {
 }
 
 cc_library {
-    name: "libgbm_",
+    name: "libgbm",
     defaults: ["minigbm_defaults"],
     host_supported: true,
 
