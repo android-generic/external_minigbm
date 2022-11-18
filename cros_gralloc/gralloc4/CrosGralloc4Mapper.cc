@@ -11,6 +11,7 @@
 #include <aidl/android/hardware/graphics/common/PlaneLayout.h>
 #include <aidl/android/hardware/graphics/common/Rect.h>
 #include <cutils/native_handle.h>
+#include <cutils/properties.h>
 #include <gralloctypes/Gralloc4.h>
 
 #include "cros_gralloc/cros_gralloc_helpers.h"
@@ -1139,6 +1140,26 @@ Return<void> CrosGralloc4Mapper::getReservedRegion(void* rawHandle, getReservedR
     return Void();
 }
 
+char default_mapper[PROPERTY_VALUE_MAX];
+char default_gralloc[PROPERTY_VALUE_MAX];
 android::hardware::graphics::mapper::V4_0::IMapper* HIDL_FETCH_IMapper(const char* /*name*/) {
+    property_get("debug.ui.default_mapper", default_mapper, "");
+    property_get("ro.hardware.gralloc", default_gralloc, "");
+    if (atoi(default_mapper) == 4) {
+#if defined(DRV_AMDGPU) || defined(DRV_I915)
+        if (strcmp(default_gralloc, "minigbm") == 0) {
     return static_cast<android::hardware::graphics::mapper::V4_0::IMapper*>(new CrosGralloc4Mapper);
+    } else {return NULL;}
+#elif defined(VIRTIO_GPU_NEXT)
+        if (strcmp(default_gralloc, "minigbm_arcvm") == 0) {
+    return static_cast<android::hardware::graphics::mapper::V4_0::IMapper*>(new CrosGralloc4Mapper);
+    } else {return NULL;}
+#elif defined(DRV_EXTERNAL)
+        if (strcmp(default_gralloc, "minigbm_gbm_mesa") == 0) {
+    return static_cast<android::hardware::graphics::mapper::V4_0::IMapper*>(new CrosGralloc4Mapper);
+    } else {return NULL;}
+#else
+    return NULL;
+#endif
+    } else {return NULL;}
 }

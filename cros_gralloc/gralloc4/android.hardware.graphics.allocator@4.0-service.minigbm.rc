@@ -22,3 +22,4 @@ service vendor.graphics.allocator-4-0 /vendor/bin/hw/android.hardware.graphics.a
     capabilities SYS_NICE
     onrestart restart surfaceflinger
     task_profiles ServiceCapacityLow
+    disabled
