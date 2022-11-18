@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-service vendor.graphics.allocator-4-0 /vendor/bin/hw/android.hardware.graphics.allocator@4.0-service.minigbm_arcvm
+service vendor.graphics.allocator-4-0-arcvm /vendor/bin/hw/android.hardware.graphics.allocator@4.0-service.minigbm_arcvm
     interface android.hardware.graphics.allocator@4.0::IAllocator default
     class hal animation
     user system
@@ -22,3 +22,4 @@ service vendor.graphics.allocator-4-0 /vendor/bin/hw/android.hardware.graphics.a
     capabilities SYS_NICE
     onrestart restart surfaceflinger
     task_profiles ServiceCapacityLow
+    disabled

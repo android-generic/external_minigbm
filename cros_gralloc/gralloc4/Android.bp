@@ -136,7 +136,8 @@ cc_library_shared {
     name: "android.hardware.graphics.mapper@4.0-impl.minigbm",
     defaults: ["minigbm_gralloc4_common_defaults"],
     shared_libs: ["libminigbm_gralloc"],
-    vintf_fragment_modules: ["android.hardware.graphics.mapper@4.0.xml"],
+    cflags: ["-DDRV_AMDGPU",
+             "-DDRV_I915"],
     srcs: [":minigbm_gralloc4_mapper_files"],
 }
 
@@ -152,7 +153,7 @@ cc_library_shared {
     name: "android.hardware.graphics.mapper@4.0-impl.minigbm_arcvm",
     defaults: ["minigbm_gralloc4_common_defaults"],
     shared_libs: ["libminigbm_gralloc_arcvm"],
-    vintf_fragment_modules: ["android.hardware.graphics.mapper@4.0.xml"],
+    cflags: ["-DVIRTIO_GPU_NEXT"],
     srcs: [":minigbm_gralloc4_mapper_files"],
 }
 
