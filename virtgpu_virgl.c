@@ -398,7 +398,7 @@ static inline void handle_flag(uint64_t *flag, uint64_t check_flag, uint32_t *bi
 	}
 }
 
-static uint32_t compute_virgl_bind_flags(uint64_t use_flags, uint32_t format)
+static uint32_t compute_virgl_bind_flags(uint64_t use_flags)
 {
 	/* In crosvm, VIRGL_BIND_SHARED means minigbm will allocate, not virglrenderer. */
 	uint32_t bind = VIRGL_BIND_SHARED;
@@ -484,7 +484,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 
 	res_create.target = PIPE_TEXTURE_2D;
 	res_create.format = translate_format(format);
-	res_create.bind = compute_virgl_bind_flags(use_flags, format);
+	res_create.bind = compute_virgl_bind_flags(use_flags);
 	res_create.width = width;
 	res_create.height = height;
 
@@ -689,7 +689,7 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
 
 	uint32_t blob_flags = VIRTGPU_BLOB_FLAG_USE_SHAREABLE;
-	if (bo->meta.use_flags & BO_USE_SW_MASK)
+	if (bo->meta.use_flags & (BO_USE_SW_MASK | BO_USE_GPU_DATA_BUFFER))
 		blob_flags |= VIRTGPU_BLOB_FLAG_USE_MAPPABLE;
 
 	// For now, all blob use cases are cross device. When we add wider
@@ -707,8 +707,7 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 	cmd[VIRGL_PIPE_RES_CREATE_WIDTH] = bo->meta.width;
 	cmd[VIRGL_PIPE_RES_CREATE_HEIGHT] = bo->meta.height;
 	cmd[VIRGL_PIPE_RES_CREATE_FORMAT] = translate_format(bo->meta.format);
-	cmd[VIRGL_PIPE_RES_CREATE_BIND] =
-	    compute_virgl_bind_flags(bo->meta.use_flags, bo->meta.format);
+	cmd[VIRGL_PIPE_RES_CREATE_BIND] = compute_virgl_bind_flags(bo->meta.use_flags);
 	cmd[VIRGL_PIPE_RES_CREATE_DEPTH] = 1;
 	cmd[VIRGL_PIPE_RES_CREATE_BLOB_ID] = cur_blob_id;
 
@@ -775,6 +774,21 @@ static int virgl_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint3
 		return virgl_3d_bo_create(bo, width, height, format, use_flags);
 	else
 		return virgl_2d_dumb_bo_create(bo, width, height, format, use_flags);
+}
+
+static int virgl_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
+					  uint32_t format, const uint64_t *modifiers,
+					  uint32_t count)
+{
+	uint64_t use_flags = 0;
+
+	for (uint32_t i = 0; i < count; i++) {
+		if (modifiers[i] == DRM_FORMAT_MOD_LINEAR) {
+			return virgl_bo_create(bo, width, height, format, use_flags);
+		}
+	}
+
+	return -EINVAL;
 }
 
 static int virgl_bo_destroy(struct bo *bo)
@@ -1102,6 +1116,7 @@ const struct backend virtgpu_virgl = { .name = "virtgpu_virgl",
 				       .init = virgl_init,
 				       .close = virgl_close,
 				       .bo_create = virgl_bo_create,
+				       .bo_create_with_modifiers = virgl_bo_create_with_modifiers,
 				       .bo_destroy = virgl_bo_destroy,
 				       .bo_import = drv_prime_bo_import,
 				       .bo_map = virgl_bo_map,
