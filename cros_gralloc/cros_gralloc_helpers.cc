@@ -18,6 +18,9 @@
 /* Define to match AIDL BufferUsage::GPU_DATA_BUFFER. */
 #define BUFFER_USAGE_GPU_DATA_BUFFER (1 << 24)
 
+/* Define to match AIDL PixelFormat::R_8. */
+#define HAL_PIXEL_FORMAT_R8 0x38
+
 uint32_t cros_gralloc_convert_format(int format)
 {
 	/*
@@ -53,6 +56,10 @@ uint32_t cros_gralloc_convert_format(int format)
 	 * equal to their size in bytes.
 	 */
 	case HAL_PIXEL_FORMAT_BLOB:
+	/*
+	 * TODO(b/259551816): re-enable after ANGLE and SwiftShader are updated.
+	 * case HAL_PIXEL_FORMAT_R8:
+	 */
 		return DRM_FORMAT_R8;
 	case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
 		return DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED;
@@ -125,7 +132,7 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	handle_usage(&usage, BUFFER_USAGE_SENSOR_DIRECT_DATA, &use_flags,
 		     BO_USE_SENSOR_DIRECT_DATA);
 	handle_usage(&usage, BUFFER_USAGE_GPU_DATA_BUFFER, &use_flags, BO_USE_GPU_DATA_BUFFER);
-	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING, &use_flags, BO_USE_FRONT_RENDERING);
+	handle_usage(&usage, BUFFER_USAGE_FRONT_RENDERING_MASK, &use_flags, BO_USE_FRONT_RENDERING);
 
 	if (usage) {
 		ALOGE("Unhandled gralloc usage: %llx", (unsigned long long)usage);
