@@ -45,7 +45,7 @@ static const uint64_t gen11_modifier_order[] = { I915_FORMAT_MOD_Y_TILED, I915_F
 						 DRM_FORMAT_MOD_LINEAR };
 
 static const uint64_t xe_lpdp_modifier_order[] = { I915_FORMAT_MOD_4_TILED, I915_FORMAT_MOD_X_TILED,
-						 DRM_FORMAT_MOD_LINEAR};
+						   DRM_FORMAT_MOD_LINEAR };
 
 struct modifier_support_t {
 	const uint64_t *order;
@@ -277,52 +277,55 @@ static int i915_add_combinations(struct driver *drv)
 
 	if (i915->is_mtl) {
 		struct format_metadata metadata_4_tiled = { .tiling = I915_TILING_4,
-						    .priority = 3,
-						    .modifier = I915_FORMAT_MOD_4_TILED };
+							    .priority = 3,
+							    .modifier = I915_FORMAT_MOD_4_TILED };
 /* Support tile4 NV12 and P010 for libva */
 #ifdef I915_SCANOUT_4_TILED
 		const uint64_t nv12_usage =
-			BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
-		const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
-                        BO_USE_SCANOUT;
+		    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+		const uint64_t p010_usage =
+		    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected | BO_USE_SCANOUT;
 #else
 		const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
 		const uint64_t p010_usage = nv12_usage;
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_4_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_4_tiled, p010_usage);
-		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_4_tiled,
-			     render_not_linear);
-		drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata_4_tiled, render_not_linear);
+		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
+				     &metadata_4_tiled, render_not_linear);
+		drv_add_combinations(drv, scanout_render_formats,
+				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
+				     render_not_linear);
 	} else {
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
-						    .priority = 3,
-						    .modifier = I915_FORMAT_MOD_Y_TILED };
+							    .priority = 3,
+							    .modifier = I915_FORMAT_MOD_Y_TILED };
 /* Support y-tiled NV12 and P010 for libva */
 #ifdef I915_SCANOUT_Y_TILED
 		const uint64_t nv12_usage =
-			BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
-		const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | hw_protected |
-			(i915->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
+		    BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER | BO_USE_SCANOUT | hw_protected;
+		const uint64_t p010_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER |
+					    hw_protected |
+					    (i915->graphics_version >= 11 ? BO_USE_SCANOUT : 0);
 #else
 		const uint64_t nv12_usage = BO_USE_TEXTURE | BO_USE_HW_VIDEO_DECODER;
 		const uint64_t p010_usage = nv12_usage;
 #endif
 		drv_add_combination(drv, DRM_FORMAT_NV12, &metadata_y_tiled, nv12_usage);
 		drv_add_combination(drv, DRM_FORMAT_P010, &metadata_y_tiled, p010_usage);
-		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats), &metadata_y_tiled,
-			     render_not_linear);
+		drv_add_combinations(drv, render_formats, ARRAY_SIZE(render_formats),
+				     &metadata_y_tiled, render_not_linear);
 		/* Y-tiled scanout isn't available on old platforms so we add
 		 * |scanout_render_formats| without that USE flag.
 		 */
-		drv_add_combinations(drv, scanout_render_formats, ARRAY_SIZE(scanout_render_formats),
-			     &metadata_y_tiled, render_not_linear);
+		drv_add_combinations(drv, scanout_render_formats,
+				     ARRAY_SIZE(scanout_render_formats), &metadata_y_tiled,
+				     render_not_linear);
 	}
 	return 0;
 }
 
-static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *stride,
+static int i915_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, uint32_t *stride,
 				 uint32_t *aligned_height)
 {
 	struct i915_device *i915 = bo->drv->priv;
@@ -348,7 +351,24 @@ static int i915_align_dimensions(struct bo *bo, uint32_t tiling, uint32_t *strid
 #else
 		horizontal_alignment = 64;
 #endif
-		vertical_alignment = 4;
+		/*
+		 * For R8 and height=1, we assume the surface will be used as a linear buffer blob
+		 * (such as VkBuffer). The hardware allows vertical_alignment=1 only for non-tiled
+		 * 1D surfaces, which covers the VkBuffer case. However, if the app uses the surface
+		 * as a 2D image with height=1, then this code is buggy. For 2D images, the hardware
+		 * requires a vertical_alignment >= 4, and underallocating with vertical_alignment=1
+		 * will cause the GPU to read out-of-bounds.
+		 *
+		 * TODO: add a new DRM_FORMAT_BLOB format for this case, or further tighten up the
+		 * constraints with GPU_DATA_BUFFER usage when the guest has migrated to use
+		 * virtgpu_cross_domain backend which passes that flag through.
+		 */
+		if (format == DRM_FORMAT_R8 && *aligned_height == 1) {
+			vertical_alignment = 1;
+		} else {
+			vertical_alignment = 4;
+		}
+
 		break;
 
 	case I915_TILING_X:
@@ -479,7 +499,7 @@ static int i915_bo_from_format(struct bo *bo, uint32_t width, uint32_t height, u
 		if (bo->meta.tiling != I915_TILING_NONE)
 			assert(IS_ALIGNED(offset, pagesize));
 
-		ret = i915_align_dimensions(bo, bo->meta.tiling, &stride, &plane_height);
+		ret = i915_align_dimensions(bo, format, bo->meta.tiling, &stride, &plane_height);
 		if (ret)
 			return ret;
 
@@ -602,7 +622,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		 * aligning to 32 bytes here.
 		 */
 		uint32_t stride = ALIGN(width, 32);
-		drv_bo_from_format(bo, stride, height, format);
+		return drv_bo_from_format(bo, stride, height, format);
 	} else if (modifier == I915_FORMAT_MOD_Y_TILED_CCS) {
 		/*
 		 * For compressed surfaces, we need a color control surface
@@ -680,7 +700,7 @@ static int i915_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t heig
 		bo->meta.num_planes = i915_num_planes_from_modifier(bo->drv, format, modifier);
 		bo->meta.total_size = bo->meta.sizes[0] + bo->meta.sizes[1];
 	} else {
-		i915_bo_from_format(bo, width, height, format);
+		return i915_bo_from_format(bo, width, height, format);
 	}
 	return 0;
 }
@@ -729,7 +749,7 @@ static int i915_bo_create_from_metadata(struct bo *bo)
 
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
-         */
+	 */
 	if (i915->num_fences_avail) {
 		gem_set_tiling.handle = bo->handles[0].u32;
 		gem_set_tiling.tiling_mode = bo->meta.tiling;
@@ -769,7 +789,7 @@ static int i915_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 
 	/* Set/Get tiling ioctl not supported  based on fence availability
 	   Refer : "https://patchwork.freedesktop.org/patch/325343/"
-         */
+	 */
 	if (i915->num_fences_avail) {
 		/* TODO(gsingh): export modifiers and get rid of backdoor tiling. */
 		gem_get_tiling.handle = bo->handles[0].u32;
