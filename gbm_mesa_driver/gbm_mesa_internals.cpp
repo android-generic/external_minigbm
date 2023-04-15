@@ -48,6 +48,9 @@ extern "C" {
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
+// PRIx64
+#include <inttypes.h>
+
 #define GBM_WRAPPER_NAME "libgbm_mesa_wrapper.so"
 #define GBM_GET_OPS_SYMBOL "get_gbm_ops"
 
@@ -451,26 +454,48 @@ int gbm_mesa_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 		priv->fds[plane] = UniqueFd(dup(data->fds[plane]));
 	}
 
-	if (data->use_flags & BO_USE_SW_MASK) {
-		// Mapping require importing by gbm_mesa
-		auto drv = gbm_mesa_get_or_init_driver(bo->drv, true);
-		auto wr = drv->wrapper;
+	bo->priv = priv;
 
-		uint32_t s_format = data->format;
-		int s_height = data->height;
-		int s_width = data->width;
-		if (wr->get_gbm_format(s_format) == 0) {
-			s_width = bo->meta.total_size;
-			s_height = 1;
-			s_format = DRM_FORMAT_R8;
-		}
+	/* Defer GBM import to gbm_mesa_bo_map */
+	return 0;
+}
 
-		priv->drv = drv;
-		priv->gbm_bo = wr->import(drv->gbm_dev, data->fds[0], s_width, s_height,
-					  data->strides[0], data->format_modifier, s_format);
+static int gbm_mesa_gbm_bo_import(struct bo *bo)
+{
+	auto priv = (GbmMesaBoPriv *)bo->priv;
+
+	auto drv = gbm_mesa_get_or_init_driver(bo->drv, true);
+	auto wr = drv->wrapper;
+
+	uint32_t s_format = bo->meta.format;
+	int s_height = bo->meta.height;
+	int s_width = bo->meta.width;
+	int s_stride = bo->meta.strides[0];
+	if (wr->get_gbm_format(s_format) == 0) {
+		s_width = bo->meta.total_size;
+		s_height = 1;
+		s_format = DRM_FORMAT_R8;
 	}
 
-	bo->priv = priv;
+	if (s_format == DRM_FORMAT_R8 && s_height == 1) {
+		/* Some mesa drivers(lima) may not support large 1D buffers.
+		 * Use 2D texture (width=4096) instead.
+		 */
+		s_height = DIV_ROUND_UP(s_width, 4096);
+		s_width = s_stride = 4096;
+	}
+
+	priv->drv = drv;
+	int fd = priv->fds[0].Get();
+	priv->gbm_bo = wr->import(drv->gbm_dev, fd, s_width, s_height, s_stride,
+				  bo->meta.format_modifier, s_format);
+
+	if (!priv->gbm_bo) {
+		drv_loge("Failed to import buffer: %dx%d fd(%d), s_format(0x%x), "
+			 "modifier(0x%" PRIx64 "), stride(%d), into GBM",
+			 s_width, s_height, fd, s_format, bo->meta.format_modifier, s_stride);
+		return -EINVAL;
+	}
 
 	gbm_mesa_inode_to_handle(bo);
 
@@ -493,13 +518,21 @@ int gbm_mesa_bo_get_plane_fd(struct bo *bo, size_t plane)
 
 void *gbm_mesa_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
 {
+	if (!(bo->meta.use_flags & BO_USE_SW_MASK)) {
+		drv_loge("Can't map buffer without BO_USE_SW_MASK");
+		return MAP_FAILED;
+	}
+
+	auto priv = (GbmMesaBoPriv *)bo->priv;
+	if (!priv->gbm_bo) {
+		if (gbm_mesa_gbm_bo_import(bo) != 0)
+			return MAP_FAILED;
+	}
+
 	auto drv = gbm_mesa_get_or_init_driver(bo->drv, true);
 	auto wr = drv->wrapper;
 
 	vma->length = bo->meta.total_size;
-
-	auto priv = (GbmMesaBoPriv *)bo->priv;
-	assert(priv->gbm_bo != nullptr);
 
 	void *buf = MAP_FAILED;
 
@@ -518,12 +551,19 @@ void *gbm_mesa_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map
 
 int gbm_mesa_bo_unmap(struct bo *bo, struct vma *vma)
 {
+	if (!(bo->meta.use_flags & BO_USE_SW_MASK)) {
+		drv_loge("Can't unmap buffer without BO_USE_SW_MASK");
+		return -EINVAL;
+	}
+
 	auto drv = gbm_mesa_get_or_init_driver(bo->drv, true);
 	auto wr = drv->wrapper;
 
 	auto priv = (GbmMesaBoPriv *)bo->priv;
-	assert(priv->gbm_bo != nullptr);
-	assert(vma->priv != nullptr);
+	if (vma->priv == nullptr || priv->gbm_bo == nullptr) {
+		drv_loge("Buffer internal state is invalid");
+		return -EINVAL;
+	}
 	wr->unmap(priv->gbm_bo, vma->priv);
 	vma->priv = nullptr;
 	return 0;
