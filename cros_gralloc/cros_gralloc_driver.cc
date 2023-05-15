@@ -168,9 +168,6 @@ static void drv_destroy_and_close(struct driver *drv)
 
 cros_gralloc_driver::cros_gralloc_driver() : drv_(init_try_nodes(), drv_destroy_and_close)
 {
-	char buf[PROP_VALUE_MAX];
-	property_get("ro.product.device", buf, "unknown");
-	mt8183_camera_quirk_ = !strncmp(buf, "kukui", strlen("kukui"));
 }
 
 cros_gralloc_driver::~cros_gralloc_driver()
@@ -192,14 +189,6 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint64_t resolved_use_flags;
 	struct combination *combo;
 	int ret = 0;
-
-	if (mt8183_camera_quirk_ && (descriptor->use_flags & BO_USE_CAMERA_READ) &&
-	    !(descriptor->use_flags & BO_USE_SCANOUT) &&
-	    descriptor->drm_format == DRM_FORMAT_FLEX_IMPLEMENTATION_DEFINED) {
-		*out_use_flags = descriptor->use_flags;
-		*out_format = DRM_FORMAT_MTISP_SXYZW10;
-		return true;
-	}
 
 	drv_resolve_format_and_use_flags(drv_.get(), descriptor->drm_format, descriptor->use_flags,
 					 &resolved_format, &resolved_use_flags);

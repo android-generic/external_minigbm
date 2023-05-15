@@ -31,6 +31,7 @@ int drv_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 int drv_dumb_bo_create_ex(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 			  uint64_t use_flags, uint64_t quirks);
 int drv_dumb_bo_destroy(struct bo *bo);
+int drv_gem_close(struct driver *drv, uint32_t gem_handle);
 int drv_gem_bo_destroy(struct bo *bo);
 int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data);
 void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags);
@@ -54,5 +55,26 @@ uint32_t drv_get_inode(int dmabuf_fd);
 
 int drv_use_flags_to_string(int use_flags, char *out, int max_len);
 int drv_use_flags_to_string_short(int use_flags, char *out, int max_len);
+
+/*
+ * Get an option. Should return NULL if specified option is not set.
+ */
+const char *drv_get_os_option(const char *name);
+
+struct lru_entry {
+	struct lru_entry *next;
+	struct lru_entry *prev;
+};
+
+struct lru {
+	struct lru_entry head;
+	int count;
+	int max;
+};
+
+struct lru_entry *lru_find(struct lru *lru, bool (*eq)(struct lru_entry *e, void *data),
+			   void *data);
+void lru_insert(struct lru *lru, struct lru_entry *entry);
+void lru_init(struct lru *lru, int max);
 
 #endif

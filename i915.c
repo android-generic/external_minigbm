@@ -258,6 +258,9 @@ static int i915_add_combinations(struct driver *drv)
 				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
 				   hw_protected);
 
+	/* P010 linear can be used for scanout too. */
+	drv_modify_combination(drv, DRM_FORMAT_P010, &metadata_linear, BO_USE_SCANOUT);
+
 	/* Android CTS tests require this. */
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata_linear, BO_USE_SW_MASK);
 
@@ -302,7 +305,7 @@ static int i915_add_combinations(struct driver *drv)
 				     &metadata_4_tiled, render_not_linear);
 		drv_add_combinations(drv, scanout_render_formats,
 				     ARRAY_SIZE(scanout_render_formats), &metadata_4_tiled,
-				     render_not_linear);
+				     scanout_and_render_not_linear);
 	} else {
 		struct format_metadata metadata_y_tiled = { .tiling = I915_TILING_Y,
 							    .priority = 3,
@@ -418,9 +421,14 @@ static void i915_clflush(void *start, size_t size)
 
 	__builtin_ia32_mfence();
 	while (p < end) {
+#if defined(__CLFLUSHOPT__)
+		__builtin_ia32_clflushopt(p);
+#else
 		__builtin_ia32_clflush(p);
+#endif
 		p = (void *)((uintptr_t)p + I915_CACHELINE_SIZE);
 	}
+	__builtin_ia32_mfence();
 }
 
 static int i915_init(struct driver *drv)

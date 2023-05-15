@@ -17,6 +17,10 @@
 #include <unistd.h>
 #include <xf86drm.h>
 
+#ifdef __ANDROID__
+#include <cutils/properties.h>
+#endif
+
 #include "drv_priv.h"
 #include "util.h"
 
@@ -414,7 +418,7 @@ int drv_dumb_bo_destroy(struct bo *bo)
 	return 0;
 }
 
-static int drv_gem_close(struct driver *drv, uint32_t gem_handle)
+int drv_gem_close(struct driver *drv, uint32_t gem_handle)
 {
 	struct drm_gem_close gem_close;
 	int ret, error = 0;
@@ -672,4 +676,64 @@ int drv_use_flags_to_string_short(int use_flags, char *out, int max_len)
 	FLAG_TO_STR(BO_USE_SENSOR_DIRECT_DATA, "s");
 
 	return 0;
+}
+
+const char *drv_get_os_option(const char *name)
+{
+#ifdef __ANDROID__
+	static char prop[PROPERTY_VALUE_MAX];
+	return property_get(name, prop, NULL) > 1 ? prop : NULL;
+#else
+	return getenv(name);
+#endif
+}
+
+static void lru_remove_entry(struct lru_entry *entry)
+{
+	entry->prev->next = entry->next;
+	entry->next->prev = entry->prev;
+}
+
+static void lru_link_entry(struct lru *lru, struct lru_entry *entry)
+{
+	struct lru_entry *head = &lru->head;
+	entry->prev = head;
+	entry->next = head->next;
+
+	head->next->prev = entry;
+	head->next = entry;
+}
+
+struct lru_entry *lru_find(struct lru *lru, bool (*eq)(struct lru_entry *e, void *data), void *data)
+{
+	struct lru_entry *head = &lru->head;
+	struct lru_entry *cur = head->next;
+
+	while (cur != head) {
+		if (eq(cur, data)) {
+			lru_remove_entry(cur);
+			lru_link_entry(lru, cur);
+			return cur;
+		}
+		cur = cur->next;
+	}
+
+	return NULL;
+}
+
+void lru_insert(struct lru *lru, struct lru_entry *entry)
+{
+	if (lru->count == lru->max) {
+		lru_remove_entry(lru->head.prev);
+	} else {
+		lru->count++;
+	}
+	lru_link_entry(lru, entry);
+}
+
+void lru_init(struct lru *lru, int max)
+{
+	lru->head.next = &lru->head;
+	lru->head.prev = &lru->head;
+	lru->max = max;
 }
