@@ -124,6 +124,10 @@ static int gbm_mesa_alloc(struct alloc_args *args)
 		void *map_data = NULL;
 
 		bo = gbm_bo_import(args->gbm, GBM_BO_IMPORT_FD_MODIFIER, &data, 0);
+		if (!bo) {
+			ALOGE("Failed to import BO during map_stride query");
+			return -EINVAL;
+		}
 
 		int flags = GBM_BO_TRANSFER_READ | GBM_BO_TRANSFER_WRITE;
 

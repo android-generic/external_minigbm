@@ -343,7 +343,7 @@ static void gbm_mesa_inode_to_handle(struct bo *bo)
 	for (size_t plane = 0; plane < bo->meta.num_planes; plane++) {
 		struct stat sb;
 		fstat(priv->fds[plane].Get(), &sb);
-		bo->handles[plane].u64 = sb.st_ino;
+//		bo->handle.u64; = sb.st_ino;
 	}
 }
 
@@ -387,7 +387,7 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 
 	if (alloc_args.drm_format == 0) {
 		/* Always use linear for spoofed format allocations. */
-		drv_bo_from_format(bo, alloc_args.width, alloc_args.height, format);
+		drv_bo_from_format(bo, alloc_args.width, 1, alloc_args.height, format);
 		bo_layout_ready = true;
 		bo->meta.total_size = ALIGN(bo->meta.total_size, size_align);
 		alloc_args.drm_format = DRM_FORMAT_R8;
@@ -402,6 +402,7 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 		/* Some mesa drivers may not support 1D allocations.
 		 * Use 2D texture with 4096 width instead.
 		 */
+		alloc_args.needs_map_stride = false;
 		alloc_args.height = DIV_ROUND_UP(alloc_args.width, 4096);
 		alloc_args.width = 4096;
 		drv_logv("Allocate 1D buffer as %dx%d R8 2D texture", alloc_args.width,
@@ -422,7 +423,7 @@ int gbm_mesa_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t 
 	}
 
 	if (!bo_layout_ready)
-		drv_bo_from_format(bo, alloc_args.out_stride, alloc_args.height, format);
+		drv_bo_from_format(bo, alloc_args.out_stride, 1, alloc_args.height, format);
 
 	drv_logv("Allocated: %dx%d, stride: %d, map_stride: %d", width, height,
 		 alloc_args.out_stride, alloc_args.out_map_stride);
@@ -516,7 +517,7 @@ int gbm_mesa_bo_get_plane_fd(struct bo *bo, size_t plane)
 	return dup(((GbmMesaBoPriv *)bo->priv)->fds[plane].Get());
 }
 
-void *gbm_mesa_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+void *gbm_mesa_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	if (!(bo->meta.use_flags & BO_USE_SW_MASK)) {
 		drv_loge("Can't map buffer without BO_USE_SW_MASK");

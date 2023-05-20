@@ -131,6 +131,8 @@ struct mapping {
 	uint32_t refcount;
 };
 
+void drv_preload(bool load);
+
 struct driver *drv_create(int fd);
 
 void drv_destroy(struct driver *drv);
@@ -207,9 +209,6 @@ uint64_t drv_resolve_use_flags(struct driver *drv, uint32_t format, uint64_t use
 size_t drv_num_planes_from_format(uint32_t format);
 
 size_t drv_num_planes_from_modifier(struct driver *drv, uint32_t format, uint64_t modifier);
-
-uint32_t drv_num_buffers_per_bo(struct bo *bo);
-
 int drv_resource_info(struct bo *bo, uint32_t strides[DRV_MAX_PLANES],
 		      uint32_t offsets[DRV_MAX_PLANES], uint64_t *format_modifier);
 

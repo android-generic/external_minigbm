@@ -29,10 +29,11 @@
 #if defined(MTK_MT8183) || \
     defined(MTK_MT8186)
 // clang-format on
-#define SUPPORTS_YUV422
+#define SUPPORT_YUV422
 #endif
 
-// All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING.
+// All platforms except MT8173 should USE_NV12_FOR_HW_VIDEO_DECODING
+// and SUPPORT_FP16_AND_10BIT_ABGR
 // clang-format off
 #if defined(MTK_MT8183) || \
     defined(MTK_MT8186) || \
@@ -41,6 +42,7 @@
     defined(MTK_MT8195)
 // clang-format on
 #define USE_NV12_FOR_HW_VIDEO_DECODING
+#define SUPPORT_FP16_AND_10BIT_ABGR
 #else
 #define DONT_USE_64_ALIGNMENT_FOR_VIDEO_BUFFERS
 #endif
@@ -65,12 +67,14 @@ static const uint32_t render_target_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMA
 
 // clang-format off
 static const uint32_t texture_source_formats[] = {
-#ifdef SUPPORTS_YUV422
+#ifdef SUPPORT_YUV422
 	DRM_FORMAT_NV21,
 	DRM_FORMAT_YUYV,
 #endif
+#ifdef SUPPORT_FP16_AND_10BIT_ABGR
 	DRM_FORMAT_ABGR2101010,
 	DRM_FORMAT_ABGR16161616F,
+#endif
 	DRM_FORMAT_NV12,
 	DRM_FORMAT_YVU420,
 	DRM_FORMAT_YVU420_ANDROID
@@ -100,7 +104,7 @@ static int mediatek_init(struct driver *drv)
 	struct format_metadata metadata;
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
-			     &LINEAR_METADATA, BO_USE_RENDER_MASK | BO_USE_SCANOUT);
+			     &LINEAR_METADATA, BO_USE_RENDER_MASK | BO_USE_SCANOUT | BO_USE_PROTECTED);
 
 	drv_add_combinations(drv, texture_source_formats, ARRAY_SIZE(texture_source_formats),
 			     &LINEAR_METADATA, BO_USE_TEXTURE_MASK);
@@ -170,6 +174,13 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 	 */
 	const bool is_camera_preview =
 	    (bo->meta.use_flags & BO_USE_SCANOUT) && (bo->meta.use_flags & BO_USE_CAMERA_WRITE);
+	const bool is_hw_video_encoder = bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER;
+	/*
+	 * Android sends blobs for encoding in the shape of a single-row pixel buffer. Use R8 +
+	 * single row as a proxy for Android HAL_PIXEL_FORMAT_BLOB until a drm equivalent is
+	 * defined.
+	 */
+	const bool is_format_blob = format == DRM_FORMAT_R8 && height == 1;
 
 	if (!drv_has_modifier(modifiers, count, DRM_FORMAT_MOD_LINEAR)) {
 		errno = EINVAL;
@@ -191,7 +202,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 	stride = ALIGN(stride, 64);
 #endif
 
-	if ((bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER) || is_camera_preview) {
+	if ((is_hw_video_encoder && !is_format_blob) || is_camera_preview) {
 		uint32_t aligned_height = ALIGN(height, 32);
 		uint32_t padding[DRV_MAX_PLANES] = { 0 };
 
@@ -201,9 +212,25 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 					 (32 / drv_vertical_subsampling_from_format(format, plane));
 		}
 
-		drv_bo_from_format_and_padding(bo, stride, aligned_height, format, padding);
+		drv_bo_from_format_and_padding(bo, stride, 1, aligned_height, format, padding);
 	} else {
-#ifdef SUPPORTS_YUV422
+#ifdef USE_EXTRA_PADDING_FOR_YVU420
+		/*
+		 * Apply extra padding for YV12 if the height does not meet round up requirement and
+		 * the image is to be sampled by gpu.
+		 */
+		static const uint32_t required_round_up = 4;
+		const uint32_t height_mod = height % required_round_up;
+		const bool is_texture = bo->meta.use_flags & BO_USE_TEXTURE;
+		/*
+		 * YVU420 and YVU420_ANDROID treatments have been aligned in mediatek backend. Check
+		 * both since gbm frontend still maps linear YVU420 to YVU420_ANDROID for other hw
+		 * backends.
+		 */
+		const bool is_format_yv12 =
+		    format == DRM_FORMAT_YVU420 || format == DRM_FORMAT_YVU420_ANDROID;
+#endif
+#ifdef SUPPORT_YUV422
 		/*
 		 * JPEG Encoder Accelerator requires 16x16 alignment. We want the buffer
 		 * from camera can be put in JEA directly so align the height to 16
@@ -212,20 +239,16 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 		if (format == DRM_FORMAT_NV12)
 			height = ALIGN(height, 16);
 #endif
-		drv_bo_from_format(bo, stride, height, format);
+		drv_bo_from_format(bo, stride, 1, height, format);
 
 #ifdef USE_EXTRA_PADDING_FOR_YVU420
-		/*
-		 * Apply extra padding for YV12 if the height does not meet round up requirement and
-		 * the image is to be sampled by gpu.
-		 */
-		static const uint32_t required_round_up = 4;
-		const uint32_t height_mod = height % required_round_up;
-		if ((format == DRM_FORMAT_YVU420 || format == DRM_FORMAT_YVU420_ANDROID) &&
-		    (bo->meta.use_flags & BO_USE_TEXTURE) && height_mod) {
+		if (is_format_yv12 && is_texture && height_mod) {
 			const uint32_t height_padding = required_round_up - height_mod;
+			const uint32_t y_padding =
+			    drv_size_from_format(format, bo->meta.strides[0], height_padding, 0);
 			const uint32_t u_padding =
 			    drv_size_from_format(format, bo->meta.strides[2], height_padding, 2);
+			const uint32_t vu_size = drv_bo_get_plane_size(bo, 2) * 2;
 
 			bo->meta.total_size += u_padding;
 
@@ -233,9 +256,6 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 			 * Since we are not aligning Y, we must make sure that its padding fits
 			 * inside the rest of the space allocated for the V/U planes.
 			 */
-			const uint32_t y_padding =
-			    drv_size_from_format(format, bo->meta.strides[0], height_padding, 0);
-			const uint32_t vu_size = drv_bo_get_plane_size(bo, 2) * 2;
 			if (y_padding > vu_size) {
 				/* Align with mali workaround to pad all 3 planes. */
 				bo->meta.total_size += y_padding + u_padding;
@@ -246,14 +266,17 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 
 	gem_create.size = bo->meta.total_size;
 
+	/* For protected data buffer needs to be allocated from GEM */
+	if (bo->meta.use_flags & BO_USE_PROTECTED)
+		gem_create.flags |= DRM_MTK_GEM_CREATE_ENCRYPTED;
+
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MTK_GEM_CREATE, &gem_create);
 	if (ret) {
 		drv_loge("DRM_IOCTL_MTK_GEM_CREATE failed (size=%" PRIu64 ")\n", gem_create.size);
 		return -errno;
 	}
 
-	for (plane = 0; plane < bo->meta.num_planes; plane++)
-		bo->handles[plane].u32 = gem_create.handle;
+	bo->handle.u32 = gem_create.handle;
 
 	return 0;
 }
@@ -266,14 +289,14 @@ static int mediatek_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 						 ARRAY_SIZE(modifiers));
 }
 
-static void *mediatek_bo_map(struct bo *bo, struct vma *vma, size_t plane, uint32_t map_flags)
+static void *mediatek_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 {
 	int ret, prime_fd;
 	struct drm_mtk_gem_map_off gem_map = { 0 };
 	struct mediatek_private_map_data *priv;
 	void *addr = NULL;
 
-	gem_map.handle = bo->handles[0].u32;
+	gem_map.handle = bo->handle.u32;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MTK_GEM_MAP_OFFSET, &gem_map);
 	if (ret) {
