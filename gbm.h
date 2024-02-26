@@ -403,6 +403,24 @@ gbm_bo_map(struct gbm_bo *bo,
            uint32_t x, uint32_t y, uint32_t width, uint32_t height,
            uint32_t flags, uint32_t *stride, void **map_data);
 
+/**
+ * Enum to indicate the cache attributes of CPU mapping returned by
+ * gbm_bo_map()
+ *
+ * Note that definition aligns with VIRTIO_GPU_MAP_CACHE_*, RUTABAGA_MAP_CACHE_*,
+ * and VIRGL_RENDERER_MAP_CACHE_* (but skipping the _NONE and _UNCACHED values as
+ * those don't actually make sense to use).
+ */
+enum gbm_bo_map_cache_mode {
+   /*GBM_BO_MAP_CACHE_NONE = 0,*/
+   GBM_BO_MAP_CACHE_CACHED = 1,
+   /*GBM_BO_MAP_CACHE_UNCACHED = 2,*/
+   GBM_BO_MAP_CACHE_WC = 3,
+};
+
+enum gbm_bo_map_cache_mode
+gbm_bo_get_map_info(struct gbm_bo *bo);
+
 void
 gbm_bo_unmap(struct gbm_bo *bo, void *map_data);
 

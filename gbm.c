@@ -270,6 +270,13 @@ PUBLIC void *gbm_bo_map(struct gbm_bo *bo, uint32_t x, uint32_t y, uint32_t widt
 	return gbm_bo_map2(bo, x, y, width, height, transfer_flags, stride, map_data, 0);
 }
 
+PUBLIC enum gbm_bo_map_cache_mode gbm_bo_get_map_info(struct gbm_bo *bo)
+{
+	if (drv_bo_cached(bo->bo))
+		return GBM_BO_MAP_CACHE_CACHED;
+	return GBM_BO_MAP_CACHE_WC;
+}
+
 PUBLIC void gbm_bo_unmap(struct gbm_bo *bo, void *map_data)
 {
 	assert(bo);

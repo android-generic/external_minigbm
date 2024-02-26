@@ -12,6 +12,10 @@ CPPFLAGS += -D_GNU_SOURCE=1
 CFLAGS += -std=c99 -Wall -Wsign-compare -Wpointer-arith -Wcast-qual \
 	  -Wcast-align -D_GNU_SOURCE=1 -D_FILE_OFFSET_BITS=64
 
+# Dependencies that all gtest based unittests should have.
+UNITTEST_LIBS := -lcap -lgtest -lgmock
+UNITTEST_DEPS := gbm_unittest.o testrunner.o gbm.o dri.o drv_array_helpers.o drv_helpers.o drv.o backend_mock.o virtgpu_cross_domain.o virtgpu_virgl.o virtgpu.o msm.o vc4.o amdgpu.o i915.o mediatek.o dumb_driver.o
+
 ifdef DRV_AMDGPU
 	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm_amdgpu)
 	LDLIBS += -ldrm_amdgpu -ldl
@@ -51,6 +55,13 @@ CC_STATIC_LIBRARY(libminigbm.pie.a): $(C_OBJECTS)
 all: CC_LIBRARY($(MINIGBM_FILENAME))
 
 clean: CLEAN($(MINIGBM_FILENAME))
+
+CXX_BINARY(gbm_unittest): CXXFLAGS += -Wno-write-strings \
+						$(GTEST_CXXFLAGS)
+CXX_BINARY(gbm_unittest): LDLIBS += $(UNITTEST_LIBS)
+CXX_BINARY(gbm_unittest): $(UNITTEST_DEPS)
+clean: CLEAN(gbm_unittest)
+tests: TEST(CXX_BINARY(gbm_unittest))
 
 install: all
 	mkdir -p $(DESTDIR)/$(LIBDIR)

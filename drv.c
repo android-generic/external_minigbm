@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,6 +19,9 @@
 #ifdef __ANDROID__
 #include <cutils/log.h>
 #include <libgen.h>
+#define MINIGBM_DEBUG "vendor.minigbm.debug"
+#else
+#define MINIGBM_DEBUG "MINIGBM_DEBUG"
 #endif
 
 #include "drv_helpers.h"
@@ -63,6 +67,8 @@ extern const struct backend backend_udl;
 extern const struct backend backend_vkms;
 #endif
 
+extern const struct backend backend_mock;
+
 static const struct backend *drv_backend_list[] = {
 #ifdef DRV_AMDGPU
 	&backend_amdgpu,
@@ -80,7 +86,8 @@ static const struct backend *drv_backend_list[] = {
 #ifdef DRV_DUMB
 	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
 	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
-	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_vkms
+	&backend_sun4i_drm, &backend_synaptics, &backend_udl,	  &backend_vkms,
+	&backend_mock
 #endif
 };
 
@@ -128,8 +135,9 @@ struct driver *drv_create(int fd)
 		return NULL;
 
 	const char *minigbm_debug;
-	minigbm_debug = drv_get_os_option("MINIGBM_DEBUG");
-	drv->compression = (minigbm_debug == NULL) || (strcmp(minigbm_debug, "nocompression") != 0);
+	minigbm_debug = drv_get_os_option(MINIGBM_DEBUG);
+	drv->compression = (minigbm_debug == NULL) || (strstr(minigbm_debug, "nocompression") == NULL);
+	drv->log_bos = (minigbm_debug && strstr(minigbm_debug, "log_bos") != NULL);
 
 	drv->fd = fd;
 	drv->backend = drv_get_backend(fd);
@@ -385,6 +393,9 @@ int drv_bo_create(struct driver *drv, uint32_t width, uint32_t height, uint32_t 
 
 	drv_bo_acquire(bo);
 
+	if (drv->log_bos)
+		drv_bo_log_info(bo, "legacy created");
+
 	*out_bo = bo;
 	return 0;
 }
@@ -422,6 +433,9 @@ struct bo *drv_bo_create_with_modifiers(struct driver *drv, uint32_t width, uint
 	}
 
 	drv_bo_acquire(bo);
+
+	if (drv->log_bos)
+		drv_bo_log_info(bo, "created");
 
 	return bo;
 }
@@ -482,6 +496,9 @@ struct bo *drv_bo_import(struct driver *drv, struct drv_import_fd_data *data)
 
 		bo->meta.total_size += bo->meta.sizes[plane];
 	}
+
+	if (drv->log_bos)
+		drv_bo_log_info(bo, "imported");
 
 	return bo;
 
@@ -595,6 +612,11 @@ int drv_bo_unmap(struct bo *bo, struct mapping *mapping)
 out:
 	pthread_mutex_unlock(&drv->mappings_lock);
 	return ret;
+}
+
+bool drv_bo_cached(struct bo *bo)
+{
+	return bo->meta.cached;
 }
 
 int drv_bo_invalidate(struct bo *bo, struct mapping *mapping)
@@ -755,6 +777,26 @@ uint32_t drv_bo_get_pixel_stride(struct bo *bo)
 	return DIV_ROUND_UP(map_stride, bytes_per_pixel);
 }
 
+void drv_bo_log_info(const struct bo *bo, const char *prefix)
+{
+	const struct bo_metadata *meta = &bo->meta;
+
+	drv_logd("%s %s bo %p: %dx%d '%c%c%c%c' tiling %d plane %zu mod 0x%" PRIx64 " use 0x%" PRIx64 " size %zu\n",
+		 prefix, bo->drv->backend->name, bo,
+		 meta->width, meta->height,
+		 meta->format & 0xff,
+		 (meta->format >> 8) & 0xff,
+		 (meta->format >> 16) & 0xff,
+		 (meta->format >> 24) & 0xff,
+		 meta->tiling, meta->num_planes, meta->format_modifier,
+		 meta->use_flags, meta->total_size);
+	for (uint32_t i = 0; i < meta->num_planes; i++) {
+		drv_logd("  bo %p plane %d: offset %d size %d stride %d\n",
+			 bo, i, meta->offsets[i], meta->sizes[i],
+			 meta->strides[i]);
+	}
+}
+
 /*
  * Map internal fourcc codes back to standard fourcc codes.
  */
@@ -798,13 +840,8 @@ void drv_log_prefix(enum drv_log_level level, const char *prefix, const char *fi
 	};
 	__android_log_vprint(prio, buf, format, args);
 #else
-	if (level == DRV_LOGE) {
-		fprintf(stderr, "%s ", buf);
-		vfprintf(stderr, format, args);
-	} else {
-		fprintf(stdout, "%s ", buf);
-		vfprintf(stdout, format, args);
-	}
+	fprintf(stderr, "%s ", buf);
+	vfprintf(stderr, format, args);
 #endif
 	va_end(args);
 }
