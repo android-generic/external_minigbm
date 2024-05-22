@@ -65,6 +65,11 @@ uint32_t cros_gralloc_buffer::get_width() const
 	return hnd_->width;
 }
 
+uint32_t cros_gralloc_buffer::get_pixel_stride() const
+{
+	return hnd_->pixel_stride;
+}
+
 uint32_t cros_gralloc_buffer::get_height() const
 {
 	return hnd_->height;
@@ -110,9 +115,9 @@ int32_t cros_gralloc_buffer::get_android_format() const
 	return hnd_->droid_format;
 }
 
-uint64_t cros_gralloc_buffer::get_android_usage() const
+int64_t cros_gralloc_buffer::get_android_usage() const
 {
-	return static_cast<uint64_t>(hnd_->usage);
+	return hnd_->usage;
 }
 
 int32_t cros_gralloc_buffer::increase_refcount()

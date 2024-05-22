@@ -87,10 +87,21 @@ PUBLIC struct gbm_surface *gbm_surface_create_with_modifiers(struct gbm_device *
 							     const uint64_t *modifiers,
 							     const unsigned int count)
 {
+	return gbm_surface_create_with_modifiers2(gbm, width, height, format, modifiers, count, 0);
+}
+
+PUBLIC struct gbm_surface *
+gbm_surface_create_with_modifiers2(struct gbm_device *gbm, uint32_t width, uint32_t height,
+				   uint32_t format, const uint64_t *modifiers,
+				   const unsigned int count, uint32_t flags)
+{
 	if (count != 0 || modifiers != NULL)
 		return NULL;
 
-	return gbm_surface_create(gbm, width, height, format, 0);
+	if (flags != 0)
+		return NULL;
+
+	return gbm_surface_create(gbm, width, height, format, flags);
 }
 
 PUBLIC struct gbm_bo *gbm_surface_lock_front_buffer(struct gbm_surface *surface)
@@ -164,7 +175,18 @@ PUBLIC struct gbm_bo *gbm_bo_create_with_modifiers(struct gbm_device *gbm, uint3
 						   uint32_t height, uint32_t format,
 						   const uint64_t *modifiers, uint32_t count)
 {
+	return gbm_bo_create_with_modifiers2(gbm, width, height, format, modifiers, count, 0);
+}
+
+PUBLIC struct gbm_bo *gbm_bo_create_with_modifiers2(struct gbm_device *gbm, uint32_t width,
+						    uint32_t height, uint32_t format,
+						    const uint64_t *modifiers,
+						    const unsigned int count, uint32_t flags)
+{
 	struct gbm_bo *bo;
+
+	if (flags != 0)
+		return NULL;
 
 	bo = gbm_bo_new(gbm, format);
 
@@ -270,6 +292,13 @@ PUBLIC void *gbm_bo_map(struct gbm_bo *bo, uint32_t x, uint32_t y, uint32_t widt
 	return gbm_bo_map2(bo, x, y, width, height, transfer_flags, stride, map_data, 0);
 }
 
+PUBLIC enum gbm_bo_map_cache_mode gbm_bo_get_map_info(struct gbm_bo *bo)
+{
+	if (drv_bo_cached(bo->bo))
+		return GBM_BO_MAP_CACHE_CACHED;
+	return GBM_BO_MAP_CACHE_WC;
+}
+
 PUBLIC void gbm_bo_unmap(struct gbm_bo *bo, void *map_data)
 {
 	assert(bo);
@@ -326,7 +355,7 @@ PUBLIC int gbm_bo_get_plane_count(struct gbm_bo *bo)
 	return drv_bo_get_num_planes(bo->bo);
 }
 
-PUBLIC union gbm_bo_handle gbm_bo_get_handle_for_plane(struct gbm_bo *bo, size_t plane)
+PUBLIC union gbm_bo_handle gbm_bo_get_handle_for_plane(struct gbm_bo *bo, int plane)
 {
 	return (union gbm_bo_handle)drv_bo_get_plane_handle(bo->bo, (size_t)plane).u64;
 }
@@ -336,12 +365,12 @@ PUBLIC int gbm_bo_get_fd_for_plane(struct gbm_bo *bo, int plane)
 	return drv_bo_get_plane_fd(bo->bo, plane);
 }
 
-PUBLIC uint32_t gbm_bo_get_offset(struct gbm_bo *bo, size_t plane)
+PUBLIC uint32_t gbm_bo_get_offset(struct gbm_bo *bo, int plane)
 {
 	return drv_bo_get_plane_offset(bo->bo, (size_t)plane);
 }
 
-PUBLIC uint32_t gbm_bo_get_stride_for_plane(struct gbm_bo *bo, size_t plane)
+PUBLIC uint32_t gbm_bo_get_stride_for_plane(struct gbm_bo *bo, int plane)
 {
 	return drv_bo_get_plane_stride(bo->bo, (size_t)plane);
 }

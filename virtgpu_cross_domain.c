@@ -16,7 +16,6 @@
 #include "util.h"
 #include "virtgpu.h"
 
-#define CAPSET_CROSS_DOMAIN 5
 #define CAPSET_CROSS_FAKE 30
 
 static const uint32_t scanout_render_formats[] = { DRM_FORMAT_ABGR8888, DRM_FORMAT_ARGB8888,
@@ -246,7 +245,7 @@ static int cross_domain_init(struct driver *drv)
 	if (!params[param_context_init].value)
 		return -ENOTSUP;
 
-	if ((params[param_supported_capset_ids].value & (1 << CAPSET_CROSS_DOMAIN)) == 0)
+	if ((params[param_supported_capset_ids].value & (1 << VIRTIO_GPU_CAPSET_CROSS_DOMAIN)) == 0)
 		return -ENOTSUP;
 
 	if (!params[param_resource_blob].value)
@@ -275,7 +274,7 @@ static int cross_domain_init(struct driver *drv)
 	priv->ring_addr = MAP_FAILED;
 	drv->priv = priv;
 
-	args.cap_set_id = CAPSET_CROSS_DOMAIN;
+	args.cap_set_id = VIRTIO_GPU_CAPSET_CROSS_DOMAIN;
 	args.size = sizeof(struct CrossDomainCapabilities);
 	args.addr = (unsigned long long)&cross_domain_caps;
 
@@ -296,7 +295,7 @@ static int cross_domain_init(struct driver *drv)
 	// Intialize the cross domain context.  Create one fence context to wait for metadata
 	// queries.
 	ctx_set_params[0].param = VIRTGPU_CONTEXT_PARAM_CAPSET_ID;
-	ctx_set_params[0].value = CAPSET_CROSS_DOMAIN;
+	ctx_set_params[0].value = VIRTIO_GPU_CAPSET_CROSS_DOMAIN;
 	ctx_set_params[1].param = VIRTGPU_CONTEXT_PARAM_NUM_RINGS;
 	ctx_set_params[1].value = 1;
 
@@ -346,7 +345,7 @@ static int cross_domain_init(struct driver *drv)
 		goto free_private;
 
 	const char *name;
-	name = drv_get_os_option("RO_PRODUCT_DEVICE");
+	name = drv_get_os_option("ro.product.name");
 	priv->mt8183_camera_quirk_ = name && !strcmp(name, "kukui");
 
 	// minigbm bookkeeping
