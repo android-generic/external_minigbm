@@ -152,6 +152,13 @@ static void msm_calculate_layout(struct bo *bo)
 
 		/* Calculate size and assign stride, size, offset to each plane based on format */
 		drv_bo_from_format(bo, stride, 1, alignh, bo->meta.format);
+		if (bo->meta.format == DRM_FORMAT_YVU420_ANDROID ||
+		    bo->meta.format == DRM_FORMAT_YVU420) {
+			const uint32_t u_size =
+			    drv_size_from_format(bo->meta.format, bo->meta.strides[2], alignh, 2);
+			const uint32_t padding = ALIGN(u_size, PLANE_SIZE_ALIGN) - u_size;
+			bo->meta.total_size += padding;
+		}
 
 		/* For all RGB UBWC formats */
 		if (bo->meta.tiling == MSM_UBWC_TILING) {
