@@ -316,15 +316,8 @@ Return<void> CrosGralloc4Mapper::unlock(void* rawHandle, unlock_cb hidlCb) {
         return Void();
     }
 
-    hidl_handle releaseFenceHandle;
-    ret = convertToFenceHandle(releaseFenceFd, &releaseFenceHandle);
-    if (ret) {
-        ALOGE("Failed to unlock. Failed to convert release fence to handle.");
-        hidlCb(Error::BAD_BUFFER, nullptr);
-        return Void();
-    }
-
-    hidlCb(Error::NONE, releaseFenceHandle);
+    NATIVE_HANDLE_DECLARE_STORAGE(releaseFenceHandleStorage, 1, 0);
+    hidlCb(Error::NONE, convertToFenceHandle(releaseFenceFd, releaseFenceHandleStorage));
     return Void();
 }
 
@@ -356,15 +349,8 @@ Return<void> CrosGralloc4Mapper::flushLockedBuffer(void* rawHandle, flushLockedB
         return Void();
     }
 
-    hidl_handle releaseFenceHandle;
-    ret = convertToFenceHandle(releaseFenceFd, &releaseFenceHandle);
-    if (ret) {
-        ALOGE("Failed to flushLockedBuffer. Failed to convert release fence to handle.");
-        hidlCb(Error::BAD_BUFFER, nullptr);
-        return Void();
-    }
-
-    hidlCb(Error::NONE, releaseFenceHandle);
+    NATIVE_HANDLE_DECLARE_STORAGE(releaseFenceHandleStorage, 1, 0);
+    hidlCb(Error::NONE, convertToFenceHandle(releaseFenceFd, releaseFenceHandleStorage));
     return Void();
 }
 
@@ -873,6 +859,12 @@ Return<void> CrosGralloc4Mapper::listSupportedMetadataTypes(listSupportedMetadat
             },
             {
                     android::gralloc4::MetadataType_PlaneLayouts,
+                    "",
+                    /*isGettable=*/true,
+                    /*isSettable=*/false,
+            },
+            {
+                    android::gralloc4::MetadataType_Crop,
                     "",
                     /*isGettable=*/true,
                     /*isSettable=*/false,
