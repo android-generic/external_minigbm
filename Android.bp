@@ -144,19 +144,6 @@ cc_defaults {
     srcs: [":minigbm_gralloc0_files"],
 }
 
-generic_cflags = ["-DHAS_DMABUF_SYSTEM_HEAP",
-                  "-DDRV_AMDGPU",
-                  "-DDRV_RADEON", 
-                  "-DDRV_I915"]
-intel_cflags = ["-DDRV_I915"]
-meson_cflags = ["-DDRV_MESON"]
-msm_cflags = [
-    "-DDRV_MSM",
-    "-DQCOM_DISABLE_COMPRESSED_NV12",
-    "-DHAS_DMABUF_SYSTEM_HEAP",
-]
-arcvm_cflags = ["-DVIRTIO_GPU_NEXT"]
-
 cc_library {
     name: "libgbm",
     defaults: ["minigbm_defaults"],
@@ -168,15 +155,6 @@ cc_library {
         "gbm_helpers.c",
         "minigbm_helpers.c",
     ],
-
-    cflags: select(soong_config_variable("minigbm", "platform"), {
-        "generic": generic_cflags,
-        "intel": intel_cflags,
-        "meson": meson_cflags,
-        "msm": msm_cflags,
-        "arcvm": arcvm_cflags,
-        default: [],
-    }),
 
     target: {
         host: {
@@ -238,7 +216,10 @@ cc_library_shared {
     defaults: ["minigbm_cros_gralloc_library_defaults"],
     include_dirs: ["external/libdrm/amdgpu",
                     "external/mesa/include"],
-    cflags: generic_cflags,
+    cflags: ["-DHAS_DMABUF_SYSTEM_HEAP",
+                  "-DDRV_AMDGPU",
+                  "-DDRV_RADEON", 
+                  "-DDRV_I915"],
 }
 
 cc_library_shared {
@@ -261,7 +242,7 @@ cc_library_headers {
 cc_library_shared {
     name: "libminigbm_gralloc_intel",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: intel_cflags,
+    cflags: ["-DDRV_I915"],
     enabled: false,
     arch: {
         x86: {
@@ -292,7 +273,7 @@ cc_library_shared {
 cc_library_shared {
     name: "libminigbm_gralloc_meson",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: meson_cflags,
+    cflags: ["-DDRV_MESON"],
 }
 
 cc_library_shared {
@@ -305,7 +286,11 @@ cc_library_shared {
 cc_library_shared {
     name: "libminigbm_gralloc_msm",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: msm_cflags,
+    cflags: [
+        "-DDRV_MSM",
+        "-DQCOM_DISABLE_COMPRESSED_NV12",
+        "-DHAS_DMABUF_SYSTEM_HEAP",
+    ],
 }
 
 cc_library_shared {
@@ -318,7 +303,7 @@ cc_library_shared {
 cc_library_shared {
     name: "libminigbm_gralloc_arcvm",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
-    cflags: arcvm_cflags,
+    cflags: ["-DVIRTIO_GPU_NEXT"],
 }
 
 cc_library_shared {
