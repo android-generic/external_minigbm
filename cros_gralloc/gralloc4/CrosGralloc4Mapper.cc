@@ -439,7 +439,7 @@ Return<void> CrosGralloc4Mapper::get(const cros_gralloc_buffer* crosBuffer,
         return Void();
     }
 
-    const struct cros_gralloc_buffer_metadata* crosMetadata = nullptr;
+    const CrosGralloc4Metadata* crosMetadata = nullptr;
     if (metadataType == android::gralloc4::MetadataType_BlendMode ||
         metadataType == android::gralloc4::MetadataType_Cta861_3 ||
         metadataType == android::gralloc4::MetadataType_Dataspace ||
@@ -609,7 +609,7 @@ Error CrosGralloc4Mapper::set(cros_gralloc_buffer* crosBuffer, const MetadataTyp
         return Error::BAD_BUFFER;
     }
 
-    struct cros_gralloc_buffer_metadata* crosMetadata = nullptr;
+    CrosGralloc4Metadata* crosMetadata = nullptr;
 
     Error error = getMutableMetadata(crosBuffer, &crosMetadata);
     if (error != Error::NONE) {
@@ -1058,15 +1058,15 @@ Error CrosGralloc4Mapper::getReservedRegionArea(const cros_gralloc_buffer* crosB
 
     switch (area) {
         case ReservedRegionArea::MAPPER4_METADATA: {
-            // struct cros_gralloc_buffer_metadata resides at the beginning reserved region.
-            *outSize = sizeof(struct cros_gralloc_buffer_metadata);
+            // CrosGralloc4Metadata resides at the beginning reserved region.
+            *outSize = sizeof(CrosGralloc4Metadata);
             break;
         }
         case ReservedRegionArea::USER_METADATA: {
-            // User metadata resides after the struct cros_gralloc_buffer_metadata.
+            // User metadata resides after the CrosGralloc4Metadata.
             *outAddr = reinterpret_cast<void*>(reinterpret_cast<char*>(*outAddr) +
-                                               sizeof(struct cros_gralloc_buffer_metadata));
-            *outSize = *outSize - sizeof(struct cros_gralloc_buffer_metadata);
+                                               sizeof(CrosGralloc4Metadata));
+            *outSize = *outSize - sizeof(CrosGralloc4Metadata);
             break;
         }
     }
@@ -1075,7 +1075,7 @@ Error CrosGralloc4Mapper::getReservedRegionArea(const cros_gralloc_buffer* crosB
 }
 
 Error CrosGralloc4Mapper::getMetadata(const cros_gralloc_buffer* crosBuffer,
-                                      const struct cros_gralloc_buffer_metadata** outMetadata) {
+                                      const CrosGralloc4Metadata** outMetadata) {
     void* addr = nullptr;
     uint64_t size;
 
@@ -1085,12 +1085,12 @@ Error CrosGralloc4Mapper::getMetadata(const cros_gralloc_buffer* crosBuffer,
         return error;
     }
 
-    *outMetadata = reinterpret_cast<const struct cros_gralloc_buffer_metadata*>(addr);
+    *outMetadata = reinterpret_cast<const CrosGralloc4Metadata*>(addr);
     return Error::NONE;
 }
 
 Error CrosGralloc4Mapper::getMutableMetadata(cros_gralloc_buffer* crosBuffer,
-                                             struct cros_gralloc_buffer_metadata** outMetadata) {
+                                             CrosGralloc4Metadata** outMetadata) {
     void* addr = nullptr;
     uint64_t size;
 
@@ -1100,7 +1100,7 @@ Error CrosGralloc4Mapper::getMutableMetadata(cros_gralloc_buffer* crosBuffer,
         return error;
     }
 
-    *outMetadata = reinterpret_cast<struct cros_gralloc_buffer_metadata*>(addr);
+    *outMetadata = reinterpret_cast<CrosGralloc4Metadata*>(addr);
     return Error::NONE;
 }
 

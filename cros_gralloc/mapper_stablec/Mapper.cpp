@@ -17,9 +17,9 @@
 
 #include <memory>
 
-#include "cros_gralloc/cros_gralloc_buffer_metadata.h"
 #include "cros_gralloc/cros_gralloc_driver.h"
 #include "cros_gralloc/cros_gralloc_handle.h"
+#include "cros_gralloc/gralloc4/CrosGralloc4Metadata.h"
 #include "cros_gralloc/gralloc4/CrosGralloc4Utils.h"
 
 using namespace ::aidl::android::hardware::graphics::common;
@@ -43,7 +43,7 @@ using ::android::base::unique_fd;
     REQUIRE_DRIVER()                                    \
     VALIDATE_BUFFER_HANDLE(bufferHandle)
 
-static_assert(CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE >=
+static_assert(CROS_GRALLOC4_METADATA_MAX_NAME_SIZE >=
                       decltype(std::declval<BufferDescriptorInfo>().name){}.size(),
               "Metadata name storage too small to fit a BufferDescriptorInfo::name");
 
@@ -110,7 +110,7 @@ class CrosGrallocMapperV5 final : public vendor::mapper::IMapperV5Impl {
 
   private:
     enum class ReservedRegionArea {
-        /* struct cros_gralloc_buffer_metadata */
+        /* CrosGralloc4Metadata */
         MAPPER4_METADATA,
 
         /* External user metadata */
@@ -122,17 +122,17 @@ class CrosGrallocMapperV5 final : public vendor::mapper::IMapperV5Impl {
                                          uint64_t* outSize);
 
     AIMapper_Error getCrosMetadata(const cros_gralloc_buffer* crosBuffer,
-                                   const struct cros_gralloc_buffer_metadata** outMetadata);
+                                   const CrosGralloc4Metadata** outMetadata);
 
     AIMapper_Error getMutableCrosMetadata(cros_gralloc_buffer* crosBuffer,
-                                          struct cros_gralloc_buffer_metadata** outMetadata);
+                                          CrosGralloc4Metadata** outMetadata);
 
     template <typename F, StandardMetadataType TYPE>
     int32_t getStandardMetadata(const cros_gralloc_buffer* crosBuffer, F&& provide,
                                 StandardMetadata<TYPE>);
 
     template <StandardMetadataType TYPE>
-    AIMapper_Error setStandardMetadata(struct cros_gralloc_buffer_metadata* crosMetadata,
+    AIMapper_Error setStandardMetadata(CrosGralloc4Metadata* crosMetadata,
                                        typename StandardMetadata<TYPE>::value_type&& value);
 
     void dumpBuffer(
@@ -329,7 +329,7 @@ int32_t CrosGrallocMapperV5::getStandardMetadata(buffer_handle_t _Nonnull buffer
 template <typename F, StandardMetadataType metadataType>
 int32_t CrosGrallocMapperV5::getStandardMetadata(const cros_gralloc_buffer* crosBuffer, F&& provide,
                                                  StandardMetadata<metadataType>) {
-    const struct cros_gralloc_buffer_metadata* crosMetadata = nullptr;
+    const CrosGralloc4Metadata* crosMetadata = nullptr;
     if constexpr (metadataType == StandardMetadataType::BLEND_MODE ||
                   metadataType == StandardMetadataType::CTA861_3 ||
                   metadataType == StandardMetadataType::DATASPACE ||
@@ -488,7 +488,7 @@ AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(buffer_handle_t _Nonnull
 
     AIMapper_Error status = AIMAPPER_ERROR_UNSUPPORTED;
     mDriver->with_buffer(crosHandle, [&](cros_gralloc_buffer* crosBuffer) {
-        struct cros_gralloc_buffer_metadata* crosMetadata = nullptr;
+        CrosGralloc4Metadata* crosMetadata = nullptr;
         status = getMutableCrosMetadata(crosBuffer, &crosMetadata);
         if (status != AIMAPPER_ERROR_NONE) {
             return;
@@ -505,7 +505,7 @@ AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(buffer_handle_t _Nonnull
 
 template <StandardMetadataType TYPE>
 AIMapper_Error CrosGrallocMapperV5::setStandardMetadata(
-        struct cros_gralloc_buffer_metadata* crosMetadata, typename StandardMetadata<TYPE>::value_type&& value) {
+        CrosGralloc4Metadata* crosMetadata, typename StandardMetadata<TYPE>::value_type&& value) {
     if constexpr (TYPE == StandardMetadataType::BLEND_MODE) {
         crosMetadata->blendMode = value;
     }
@@ -693,15 +693,15 @@ AIMapper_Error CrosGrallocMapperV5::getReservedRegionArea(const cros_gralloc_buf
 
     switch (area) {
         case ReservedRegionArea::MAPPER4_METADATA: {
-            // struct cros_gralloc_buffer_metadata resides at the beginning reserved region.
-            *outSize = sizeof(struct cros_gralloc_buffer_metadata);
+            // CrosGralloc4Metadata resides at the beginning reserved region.
+            *outSize = sizeof(CrosGralloc4Metadata);
             break;
         }
         case ReservedRegionArea::USER_METADATA: {
-            // User metadata resides after the struct cros_gralloc_buffer_metadata.
+            // User metadata resides after the CrosGralloc4Metadata.
             *outAddr = reinterpret_cast<void*>(reinterpret_cast<char*>(*outAddr) +
-                                               sizeof(struct cros_gralloc_buffer_metadata));
-            *outSize = *outSize - sizeof(struct cros_gralloc_buffer_metadata);
+                                               sizeof(CrosGralloc4Metadata));
+            *outSize = *outSize - sizeof(CrosGralloc4Metadata);
             break;
         }
     }
@@ -710,7 +710,7 @@ AIMapper_Error CrosGrallocMapperV5::getReservedRegionArea(const cros_gralloc_buf
 }
 
 AIMapper_Error CrosGrallocMapperV5::getCrosMetadata(const cros_gralloc_buffer* crosBuffer,
-                                                    const struct cros_gralloc_buffer_metadata** outMetadata) {
+                                                    const CrosGralloc4Metadata** outMetadata) {
     void* addr = nullptr;
     uint64_t size;
 
@@ -720,12 +720,12 @@ AIMapper_Error CrosGrallocMapperV5::getCrosMetadata(const cros_gralloc_buffer* c
         return error;
     }
 
-    *outMetadata = reinterpret_cast<const struct cros_gralloc_buffer_metadata*>(addr);
+    *outMetadata = reinterpret_cast<const CrosGralloc4Metadata*>(addr);
     return AIMAPPER_ERROR_NONE;
 }
 
 AIMapper_Error CrosGrallocMapperV5::getMutableCrosMetadata(cros_gralloc_buffer* crosBuffer,
-                                                           struct cros_gralloc_buffer_metadata** outMetadata) {
+                                                           CrosGralloc4Metadata** outMetadata) {
     void* addr = nullptr;
     uint64_t size;
 
@@ -735,7 +735,7 @@ AIMapper_Error CrosGrallocMapperV5::getMutableCrosMetadata(cros_gralloc_buffer* 
         return error;
     }
 
-    *outMetadata = reinterpret_cast<struct cros_gralloc_buffer_metadata*>(addr);
+    *outMetadata = reinterpret_cast<CrosGralloc4Metadata*>(addr);
     return AIMAPPER_ERROR_NONE;
 }
 

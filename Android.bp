@@ -118,7 +118,6 @@ cc_defaults {
         "libcutils",
         "libdmabufheap",
         "libdrm",
-        "libgralloctypes",
         "libnativewindow",
         "libsync",
         "liblog",
