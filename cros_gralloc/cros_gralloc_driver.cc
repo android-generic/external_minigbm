@@ -15,7 +15,6 @@
 #include <xf86drm.h>
 
 #include "../util.h"
-#include "cros_gralloc_buffer_metadata.h"
 
 // Constants taken from pipe_loader_drm.c in Mesa
 
@@ -294,7 +293,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	num_planes = drv_bo_get_num_planes(bo);
 	num_fds = num_planes;
 
-	if (descriptor->enable_metadata_fd)
+	if (descriptor->reserved_region_size > 0)
 		num_fds += 1;
 
 	num_ints = ((sizeof(struct cros_gralloc_handle) - sizeof(native_handle_t)) / sizeof(int)) -
@@ -318,11 +317,7 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 		hnd->sizes[plane] = drv_bo_get_plane_size(bo, plane);
 	}
 
-	hnd->reserved_region_size = 0;
-	if (descriptor->enable_metadata_fd)
-		hnd->reserved_region_size =
-		    sizeof(struct cros_gralloc_buffer_metadata) + descriptor->client_metadata_size;
-
+	hnd->reserved_region_size = descriptor->reserved_region_size;
 	if (hnd->reserved_region_size > 0) {
 		ret = create_reserved_region(descriptor->name, hnd->reserved_region_size);
 		if (ret < 0)
@@ -343,18 +338,12 @@ int32_t cros_gralloc_driver::allocate(const struct cros_gralloc_buffer_descripto
 	hnd->magic = cros_gralloc_magic;
 	hnd->droid_format = descriptor->droid_format;
 	hnd->usage = descriptor->droid_usage;
-	hnd->total_size = hnd->reserved_region_size + drv_bo_get_total_size(bo);
+	hnd->total_size = descriptor->reserved_region_size + drv_bo_get_total_size(bo);
 
 	buffer = cros_gralloc_buffer::create(bo, hnd);
 	if (!buffer) {
 		ALOGE("Failed to allocate: failed to create cros_gralloc_buffer.");
 		ret = -1;
-		goto destroy_hnd;
-	}
-
-	ret = buffer->initialize_metadata(descriptor);
-	if (ret) {
-		ALOGE("Failed to allocate: failed to initialize cros_gralloc_buffer metadata.");
 		goto destroy_hnd;
 	}
 
