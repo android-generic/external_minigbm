@@ -26,8 +26,6 @@
 // Adopt BufferUsage::FRONT_BUFFER from api level 33
 #define BUFFER_USAGE_FRONT_RENDERING_MASK (BUFFER_USAGE_FRONT_RENDERING | (1ULL << 32))
 
-#define CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE 1024
-
 struct cros_gralloc_buffer_descriptor {
 	uint32_t width;
 	uint32_t height;
