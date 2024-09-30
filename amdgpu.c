@@ -25,9 +25,9 @@
 #include "util.h"
 
 #ifdef __LP64__
-#define DRI_PATH "/vendor/lib64/dri/radeonsi_dri.so"
+#define DRI_PATH "/vendor/lib64/libgallium_dri.so"
 #else
-#define DRI_PATH "/vendor/lib/dri/radeonsi_dri.so"
+#define DRI_PATH "/vendor/lib/libgallium_dri.so"
 #endif
 
 #define TILE_TYPE_LINEAR 0
