@@ -21,6 +21,11 @@ struct backend backend_dmabuf_heap = {
 	.resolve_format_and_use_flags = dmabuf_resolve_format_and_use_flags,
 };
 
+struct backend *init_external_backend(int *fd)
+{
+	return &backend_dmabuf_heap;
+}
+
 #ifdef __cplusplus
 }
 #endif

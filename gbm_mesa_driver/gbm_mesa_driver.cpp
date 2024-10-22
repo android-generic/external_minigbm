@@ -37,6 +37,11 @@ struct backend backend_gbm_mesa = {
 	.resolve_format_and_use_flags = gbm_mesa_resolve_format_and_use_flags,
 };
 
+struct backend *init_external_backend()
+{
+	return &backend_gbm_mesa;
+}
+
 #ifdef __cplusplus
 }
 #endif
