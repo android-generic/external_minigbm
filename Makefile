@@ -42,6 +42,9 @@ endif
 ifdef DRV_HBM_HELPER
 	LDLIBS += -lhbm_minigbm
 endif
+ifdef DRV_VMWGFX
+	CFLAGS += $(shell $(PKG_CONFIG) --cflags libdrm)
+endif
 
 CPPFLAGS += $(PC_CFLAGS)
 LDLIBS += $(PC_LIBS)

@@ -49,6 +49,9 @@ extern const struct backend backend_msm;
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
+#ifdef DRV_VMWGFX
+extern const struct backend backend_vmwgfx;
+#endif
 
 // Dumb / generic drivers
 extern const struct backend backend_virtgpu;
@@ -81,6 +84,9 @@ static const struct backend *drv_backend_list[] = {
 #endif
 #ifdef DRV_VC4
 	&backend_vc4,
+#endif
+#ifdef DRV_VMWGFX
+   	&backend_vmwgfx,
 #endif
 	&backend_virtgpu,
 #ifdef DRV_DUMB
