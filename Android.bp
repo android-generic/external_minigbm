@@ -52,6 +52,7 @@ filegroup {
         "virtgpu.c",
         "virtgpu_cross_domain.c",
         "virtgpu_virgl.c",
+        "vmwgfx.c",
     ],
 }
 
@@ -215,10 +216,12 @@ cc_library_shared {
     name: "libminigbm_gralloc",
     defaults: ["minigbm_cros_gralloc_library_defaults"],
     include_dirs: ["external/libdrm/amdgpu",
-                    "external/mesa/include"],
+                    "external/mesa/include",
+                    "external/mesa/src/gallium/drivers/svga/include"],
     cflags: ["-DHAS_DMABUF_SYSTEM_HEAP",
                   "-DDRV_AMDGPU",
                   "-DDRV_HBM_HELPER",
+                  "-DDRV_VMWGFX",
                   "-DDRV_I915"],
 }
 
