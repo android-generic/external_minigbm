@@ -43,6 +43,7 @@ filegroup {
         "drv_array_helpers.c",
         "drv_helpers.c",
         "dumb_driver.c",
+        "hbm.c",
         "i915.c",
         "mediatek.c",
         "msm.c",
@@ -110,7 +111,7 @@ cc_defaults {
         "minigbm_headers",
     ],
 
-    static_libs: ["libarect"],
+    static_libs: ["libarect", "libhbm_minigbm"],
 
     vendor: true,
 
@@ -217,7 +218,7 @@ cc_library_shared {
                     "external/mesa/include"],
     cflags: ["-DHAS_DMABUF_SYSTEM_HEAP",
                   "-DDRV_AMDGPU",
-                  "-DDRV_RADEON", 
+                  "-DDRV_HBM_HELPER",
                   "-DDRV_I915"],
 }
 
