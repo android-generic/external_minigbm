@@ -10,9 +10,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#if !defined(ANDROID) || (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+#include <linux/dma-heap.h>
+#endif
 #include <poll.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <xf86drm.h>
@@ -39,7 +43,8 @@
     defined(MTK_MT8186) || \
     defined(MTK_MT8188G) || \
     defined(MTK_MT8192) || \
-    defined(MTK_MT8195)
+    defined(MTK_MT8195) || \
+    defined(MTK_MT8196)
 // clang-format on
 #define USE_NV12_FOR_HW_VIDEO_DECODING
 #define SUPPORT_FP16_AND_10BIT_ABGR
@@ -65,6 +70,10 @@
 #if defined(MTK_MT8186)
 #define USE_EXTRA_PADDING_FOR_YVU420
 #endif
+
+struct mediatek_private_drv_data {
+	int dma_heap_fd;
+};
 
 struct mediatek_private_map_data {
 	void *cached_addr;
@@ -119,6 +128,16 @@ static bool is_video_yuv_format(uint32_t format)
 static int mediatek_init(struct driver *drv)
 {
 	struct format_metadata metadata;
+	struct mediatek_private_drv_data *priv;
+
+	priv = calloc(1, sizeof(*priv));
+	if (!priv) {
+		drv_loge("Failed calloc private data, errno=%d\n", -errno);
+		return -errno;
+	}
+
+	priv->dma_heap_fd = -1;
+	drv->priv = priv;
 
 	drv_add_combinations(drv, render_target_formats, ARRAY_SIZE(render_target_formats),
 			     &LINEAR_METADATA,
@@ -182,6 +201,13 @@ static int mediatek_init(struct driver *drv)
 			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER | BO_USE_CAMERA_READ |
 				   BO_USE_CAMERA_WRITE);
 
+	/*
+	 * Android also frequently requests YV12 formats for some camera implementations
+	 * (including the external provider implmenetation).
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata,
+			       BO_USE_CAMERA_WRITE);
+
 #ifdef MTK_MT8183
 	/* Only for MT8183 Camera subsystem */
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &metadata,
@@ -198,6 +224,17 @@ static int mediatek_init(struct driver *drv)
 	return drv_modify_linear_combinations(drv);
 }
 
+static void mediatek_close(struct driver *drv)
+{
+	struct mediatek_private_drv_data *priv = (struct mediatek_private_drv_data *)drv->priv;
+
+	if (priv->dma_heap_fd >= 0)
+		close(priv->dma_heap_fd);
+
+	free(priv);
+	drv->priv = NULL;
+}
+
 static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint32_t height,
 					     uint32_t format, const uint64_t *modifiers,
 					     uint32_t count)
@@ -206,13 +243,17 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 	size_t plane;
 	uint32_t stride;
 	struct drm_mtk_gem_create gem_create = { 0 };
+
+	const bool is_camera_write = bo->meta.use_flags & BO_USE_CAMERA_WRITE;
+	const bool is_hw_video_encoder = bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER;
+	const bool is_linear = bo->meta.use_flags & BO_USE_LINEAR;
+	const bool is_protected = bo->meta.use_flags & BO_USE_PROTECTED;
+	const bool is_scanout = bo->meta.use_flags & BO_USE_SCANOUT;
 	/*
 	 * We identify the ChromeOS Camera App buffers via these two USE flags. Those buffers need
 	 * the same alignment as the video hardware encoding.
 	 */
-	const bool is_camera_preview =
-	    (bo->meta.use_flags & BO_USE_SCANOUT) && (bo->meta.use_flags & BO_USE_CAMERA_WRITE);
-	const bool is_hw_video_encoder = bo->meta.use_flags & BO_USE_HW_VIDEO_ENCODER;
+	const bool is_camera_preview = is_scanout && is_camera_write;
 #ifdef MTK_MT8173
 	const bool is_mt8173_video_decoder = bo->meta.use_flags & BO_USE_HW_VIDEO_DECODER;
 #else
@@ -324,11 +365,76 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 #endif
 	}
 
-	gem_create.size = bo->meta.total_size;
+	/* For protected data buffer needs to allocate from DMA_HEAP directly */
+	if (is_protected) {
+#if !defined(ANDROID) || (ANDROID_API_LEVEL >= 31 && defined(HAS_DMABUF_SYSTEM_HEAP))
+		int ret;
+		struct mediatek_private_drv_data *priv = (struct mediatek_private_drv_data *)bo->drv->priv;
+		struct dma_heap_allocation_data heap_data = {
+			.len = bo->meta.total_size,
+			.fd_flags = O_RDWR | O_CLOEXEC,
+		};
 
-	/* For protected data buffer needs to be allocated from GEM */
-	if (bo->meta.use_flags & BO_USE_PROTECTED)
-		gem_create.flags |= DRM_MTK_GEM_CREATE_ENCRYPTED;
+		if (format == DRM_FORMAT_P010) {
+			/*
+			 * Adjust the size so we don't waste tons of space. This was allocated
+			 * with 16 bpp, but we only need 10 bpp. We can safely divide by 8 because
+			 * we are aligned at a multiple higher than that.
+			 */
+			bo->meta.strides[0] = bo->meta.strides[0] * 10 / 16;
+			bo->meta.strides[1] = bo->meta.strides[1] * 10 / 16;
+			bo->meta.sizes[0] = bo->meta.sizes[0] * 10 / 16;
+			bo->meta.sizes[1] = bo->meta.sizes[1] * 10 / 16;
+			bo->meta.offsets[1] = bo->meta.sizes[0];
+			bo->meta.total_size = bo->meta.total_size * 10 / 16;
+			heap_data.len = bo->meta.total_size;
+		}
+
+		if (priv->dma_heap_fd < 0) {
+			priv->dma_heap_fd = open("/dev/dma_heap/restricted_mtk_cma", O_RDWR | O_CLOEXEC);
+			if (priv->dma_heap_fd < 0) {
+				drv_loge("Failed opening secure CMA heap errno=%d\n", -errno);
+				return -errno;
+			}
+		}
+
+		ret = ioctl(priv->dma_heap_fd, DMA_HEAP_IOCTL_ALLOC, &heap_data);
+		if (ret < 0) {
+			drv_loge("Failed allocating CMA buffer ret=%d\n", ret);
+			return ret;
+		}
+
+		/* Create GEM handle for secure CMA and close FD here */
+		ret = drmPrimeFDToHandle(bo->drv->fd, heap_data.fd, &bo->handle.u32);
+		close(heap_data.fd);
+		if (ret) {
+			drv_loge("Failed drmPrimeFDToHandle(fd:%d) ret=%d\n", heap_data.fd, ret);
+			return ret;
+		}
+#else
+		drv_loge("Protected allocation not supported\n");
+		return -1;
+#endif
+		return 0;
+	}
+
+	/*
+	 * For linear scanout buffers, the read/write pattern is usually linear i.e. each address is
+	 * accessed sequentially, and there are fewer chances that an address will be repeatedly
+	 * accessed.
+	 * This behavior leads to less TLB dependency and cache misses i.e. no need to translate the
+	 * same virtual address to a physical address multiple times.
+	 *
+	 * With that premise, it's safe to allow the DMA framework to fulfill such allocation
+	 * requests with non-continuous smaller chunks of memory (e.g., 4KiB single pages) which
+	 * are generally easier to allocate compared to large continuous chunks of memory, improving
+	 * memory allocation efficiency and reduce the risk of allocation failures, especially when
+	 * available memory budget is low or on memory-constrained devices.
+	 */
+	if (is_linear && is_scanout)
+		gem_create.flags |= DRM_MTK_GEM_CREATE_FLAG_ALLOC_SINGLE_PAGES;
+
+	gem_create.size = bo->meta.total_size;
 
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_MTK_GEM_CREATE, &gem_create);
 	if (ret) {
@@ -524,6 +630,7 @@ static void mediatek_resolve_format_and_use_flags(struct driver *drv, uint32_t f
 const struct backend backend_mediatek = {
 	.name = "mediatek",
 	.init = mediatek_init,
+	.close = mediatek_close,
 	.bo_create = mediatek_bo_create,
 	.bo_create_with_modifiers = mediatek_bo_create_with_modifiers,
 	.bo_destroy = drv_gem_bo_destroy,

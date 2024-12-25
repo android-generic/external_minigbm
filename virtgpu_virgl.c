@@ -21,6 +21,7 @@
 #include "external/virgl_hw.h"
 #include "external/virgl_protocol.h"
 #include "external/virtgpu_drm.h"
+#include "external/virtgpu_gfxstream_protocol.h"
 #include "util.h"
 #include "virtgpu.h"
 
@@ -52,6 +53,11 @@ static const uint32_t texture_source_formats[] = {
 	DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
 };
 
+static const uint32_t depth_stencil_formats[] = {
+	DRM_FORMAT_DEPTH16, DRM_FORMAT_DEPTH24, DRM_FORMAT_DEPTH24_STENCIL8,
+	DRM_FORMAT_DEPTH32, DRM_FORMAT_DEPTH32_STENCIL8
+};
+
 extern struct virtgpu_param params[];
 
 struct virgl_blob_metadata_cache {
@@ -66,6 +72,8 @@ struct virgl_blob_metadata_cache {
 struct virgl_priv {
 	int caps_is_v2;
 	union virgl_caps caps;
+	int caps_is_gfxstream;
+	struct vulkanCapset gfxstream_vulkan_caps;
 	int host_gbm_enabled;
 	atomic_int next_blob_id;
 
@@ -108,6 +116,16 @@ static uint32_t translate_format(uint32_t drm_fourcc)
 	case DRM_FORMAT_YVU420:
 	case DRM_FORMAT_YVU420_ANDROID:
 		return VIRGL_FORMAT_YV12;
+	case DRM_FORMAT_DEPTH16:
+		return VIRGL_FORMAT_Z16_UNORM;
+	case DRM_FORMAT_DEPTH24:
+		return VIRGL_FORMAT_Z24X8_UNORM;
+	case DRM_FORMAT_DEPTH24_STENCIL8:
+		return VIRGL_FORMAT_Z24_UNORM_S8_UINT;
+	case DRM_FORMAT_DEPTH32:
+		return VIRGL_FORMAT_Z32_FLOAT;
+	case DRM_FORMAT_DEPTH32_STENCIL8:
+		return VIRGL_FORMAT_Z32_FLOAT_S8X24_UINT;
 	default:
 		drv_loge("Unhandled format:%d\n", drm_fourcc);
 		return 0;
@@ -243,7 +261,7 @@ static void virgl_get_emulated_transfers_params(const struct bo *bo,
 {
 	uint32_t y_plane_height;
 	uint32_t c_plane_height;
-	struct bo_metadata emulated_metadata;
+	struct bo_metadata emulated_metadata = { 0 };
 
 	if (transfer_box->x == 0 && transfer_box->y == 0 && transfer_box->width == bo->meta.width &&
 	    transfer_box->height == bo->meta.height) {
@@ -315,6 +333,17 @@ static bool virgl_supports_combination_natively(struct driver *drv, uint32_t drm
 {
 	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
 
+	if (priv->caps_is_gfxstream) {
+		// If the data is invalid or an older version just accept all formats as previously
+		if (priv->gfxstream_vulkan_caps.protocolVersion == 0 ||
+		    priv->gfxstream_vulkan_caps.virglSupportedFormats[0] == 0)
+			return true;
+		bool supported_format = virgl_bitmask_supports_format(
+		    (struct virgl_supported_format_mask *)&priv->gfxstream_vulkan_caps
+			.virglSupportedFormats[0],
+		    drm_format);
+		return supported_format;
+	}
 	if (priv->caps.max_version == 0)
 		return true;
 
@@ -464,7 +493,7 @@ static int virgl_3d_bo_create(struct bo *bo, uint32_t width, uint32_t height, ui
 	size_t i;
 	uint32_t stride;
 	struct drm_virtgpu_resource_create res_create = { 0 };
-	struct bo_metadata emulated_metadata;
+	struct bo_metadata emulated_metadata = { 0 };
 
 	if (virgl_supports_combination_natively(bo->drv, format, use_flags)) {
 		stride = drv_stride_from_format(format, width, 0);
@@ -544,34 +573,42 @@ static uint32_t virgl_3d_get_max_texture_2d_size(struct driver *drv)
 	return UINT32_MAX;
 }
 
-static int virgl_get_caps(struct driver *drv, union virgl_caps *caps, int *caps_is_v2)
+static int virgl_get_caps(struct driver *drv, struct virgl_priv *priv)
 {
 	int ret;
 	struct drm_virtgpu_get_caps cap_args = { 0 };
 
-	memset(caps, 0, sizeof(union virgl_caps));
-	*caps_is_v2 = 0;
+	memset(&priv->caps, 0, sizeof(union virgl_caps));
+	priv->caps_is_v2 = 0;
+	memset(&priv->gfxstream_vulkan_caps, 0, sizeof(struct vulkanCapset));
 
 	if (params[param_supported_capset_ids].value) {
 		drv_logi("Supported CAPSET IDs: %u.", params[param_supported_capset_ids].value);
 		if (params[param_supported_capset_ids].value & (1 << VIRTIO_GPU_CAPSET_VIRGL2)) {
-			*caps_is_v2 = 1;
+			priv->caps_is_v2 = 1;
 		} else if (params[param_supported_capset_ids].value &
 			   (1 << VIRTIO_GPU_CAPSET_VIRGL)) {
-			*caps_is_v2 = 0;
+			priv->caps_is_v2 = 0;
+		} else if (params[param_supported_capset_ids].value &
+			   (1 << VIRTIO_GPU_CAPSET_GFXSTREAM_VULKAN)) {
+			priv->caps_is_gfxstream = 1;
 		} else {
 			drv_logi("Unrecognized CAPSET IDs: %u. Assuming all zero caps.",
 				 params[param_supported_capset_ids].value);
 			return 0;
 		}
 	} else if (params[param_capset_fix].value) {
-		*caps_is_v2 = 1;
+		priv->caps_is_v2 = 1;
 	}
 
-	cap_args.addr = (unsigned long long)caps;
-	if (*caps_is_v2) {
+	cap_args.addr = (unsigned long long)&priv->caps;
+	if (priv->caps_is_v2) {
 		cap_args.cap_set_id = VIRTIO_GPU_CAPSET_VIRGL2;
 		cap_args.size = sizeof(union virgl_caps);
+	} else if (priv->caps_is_gfxstream) {
+		cap_args.addr = (unsigned long long)&priv->gfxstream_vulkan_caps;
+		cap_args.cap_set_id = VIRTIO_GPU_CAPSET_GFXSTREAM_VULKAN;
+		cap_args.size = sizeof(struct vulkanCapset);
 	} else {
 		cap_args.cap_set_id = VIRTIO_GPU_CAPSET_VIRGL;
 		cap_args.size = sizeof(struct virgl_caps_v1);
@@ -580,7 +617,9 @@ static int virgl_get_caps(struct driver *drv, union virgl_caps *caps, int *caps_
 	ret = drmIoctl(drv->fd, DRM_IOCTL_VIRTGPU_GET_CAPS, &cap_args);
 	if (ret) {
 		drv_loge("DRM_IOCTL_VIRTGPU_GET_CAPS failed with %s\n", strerror(errno));
-		*caps_is_v2 = 0;
+		priv->caps_is_v2 = 0;
+		priv->caps_is_gfxstream = 0;
+		cap_args.addr = (unsigned long long)&priv->caps;
 
 		// Fallback to v1
 		cap_args.cap_set_id = VIRTIO_GPU_CAPSET_VIRGL;
@@ -598,7 +637,7 @@ static void virgl_init_params_and_caps(struct driver *drv)
 {
 	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
 	if (params[param_3d].value) {
-		virgl_get_caps(drv, &priv->caps, &priv->caps_is_v2);
+		virgl_get_caps(drv, priv);
 
 		// We use two criteria to determine whether host minigbm is used on the host for
 		// swapchain allocations.
@@ -639,6 +678,9 @@ static int virgl_init(struct driver *drv)
 		virgl_add_combinations(drv, texture_source_formats,
 				       ARRAY_SIZE(texture_source_formats), &LINEAR_METADATA,
 				       BO_USE_TEXTURE_MASK);
+		virgl_add_combinations(drv, depth_stencil_formats,
+				       ARRAY_SIZE(depth_stencil_formats), &LINEAR_METADATA,
+				       BO_USE_GPU_HW);
 		/* NV12 with scanout must flow through virgl_add_combination, so that the native
 		 * support is checked and scanout use_flag can be conditionally stripped. */
 		virgl_add_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,

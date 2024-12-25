@@ -101,6 +101,7 @@ static const struct planar_layout *layout_from_format(uint32_t format)
 		return &packed_1bpp_layout;
 
 	case DRM_FORMAT_R16:
+	case DRM_FORMAT_DEPTH16:
 		return &packed_2bpp_layout;
 
 	case DRM_FORMAT_YVU420:
@@ -145,6 +146,9 @@ static const struct planar_layout *layout_from_format(uint32_t format)
 	case DRM_FORMAT_RGB888:
 		return &packed_3bpp_layout;
 
+	case DRM_FORMAT_DEPTH24:
+	case DRM_FORMAT_DEPTH24_STENCIL8:
+	case DRM_FORMAT_DEPTH32:
 	case DRM_FORMAT_ABGR2101010:
 	case DRM_FORMAT_ABGR8888:
 	case DRM_FORMAT_ARGB2101010:
@@ -164,6 +168,7 @@ static const struct planar_layout *layout_from_format(uint32_t format)
 	case DRM_FORMAT_XRGB8888:
 		return &packed_4bpp_layout;
 
+	case DRM_FORMAT_DEPTH32_STENCIL8:
 	case DRM_FORMAT_ABGR16161616F:
 		return &packed_8bpp_layout;
 

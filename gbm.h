@@ -413,6 +413,18 @@ gbm_bo_map(struct gbm_bo *bo,
            uint32_t x, uint32_t y, uint32_t width, uint32_t height,
            uint32_t flags, uint32_t *stride, void **map_data);
 
+/* Neither gbm_bo_map_cache_mode nor gbm_bo_get_map_info are defined in mesa's gbm.h, or older
+ * versions of minigbm. For backwards-compatibility, users should first test for availability and
+ * provide a fallback implementation with:
+ *
+ *   #if defined(MINIGBM) && defined(MINIGBM_HAS_GBM_BO_GET_MAP_INFO)
+ *   // use gbm_bo_get_map_info()
+ *   #else
+ *   // fallback
+ *   #endif
+ */
+#define MINIGBM_HAS_GBM_BO_GET_MAP_INFO
+
 /**
  * Enum to indicate the cache attributes of CPU mapping returned by
  * gbm_bo_map()
