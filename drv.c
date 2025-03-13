@@ -43,6 +43,9 @@ extern const struct backend backend_amdgpu;
 #ifdef DRV_I915
 extern const struct backend backend_i915;
 #endif
+#ifdef DRV_XE
+extern const struct backend backend_xe;
+#endif
 #ifdef DRV_MSM
 extern const struct backend backend_msm;
 #endif
@@ -87,6 +90,9 @@ static const struct backend *drv_backend_list[] = {
 #endif
 #ifdef DRV_VMWGFX
    	&backend_vmwgfx,
+#endif
+#ifdef DRV_XE
+	&backend_xe,
 #endif
 	&backend_virtgpu,
 #ifdef DRV_DUMB

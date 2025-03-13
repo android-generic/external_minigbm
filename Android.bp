@@ -53,6 +53,7 @@ filegroup {
         "virtgpu_cross_domain.c",
         "virtgpu_virgl.c",
         "vmwgfx.c",
+        "xe.c",
     ],
 }
 
@@ -208,6 +209,7 @@ rust_bindgen {
     ],
     visibility: [
         "//external/rust/android-crates-io/crates/gbm",
+        "//system/cros-codecs",
     ],
 }
 
@@ -222,7 +224,8 @@ cc_library_shared {
                   "-DDRV_AMDGPU",
                   "-DDRV_HBM_HELPER",
                   "-DDRV_VMWGFX",
-                  "-DDRV_I915"],
+                  "-DDRV_I915",
+                  "-DDRV_XE",],
 }
 
 cc_library_shared {

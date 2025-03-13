@@ -201,6 +201,13 @@ static int mediatek_init(struct driver *drv)
 			       BO_USE_SCANOUT | BO_USE_HW_VIDEO_ENCODER | BO_USE_CAMERA_READ |
 				   BO_USE_CAMERA_WRITE);
 
+	/*
+	 * Android also frequently requests YV12 formats for some camera implementations
+	 * (including the external provider implmenetation).
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_YVU420_ANDROID, &metadata,
+			       BO_USE_CAMERA_WRITE);
+
 #ifdef MTK_MT8183
 	/* Only for MT8183 Camera subsystem */
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &metadata,
@@ -380,6 +387,7 @@ static int mediatek_bo_create_with_modifiers(struct bo *bo, uint32_t width, uint
 			bo->meta.sizes[1] = bo->meta.sizes[1] * 10 / 16;
 			bo->meta.offsets[1] = bo->meta.sizes[0];
 			bo->meta.total_size = bo->meta.total_size * 10 / 16;
+			heap_data.len = bo->meta.total_size;
 		}
 
 		if (priv->dma_heap_fd < 0) {

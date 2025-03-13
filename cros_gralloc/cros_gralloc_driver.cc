@@ -14,6 +14,8 @@
 #include <syscall.h>
 #include <xf86drm.h>
 
+#include "../drv_helpers.h"
+#include "../drv_priv.h"
 #include "../util.h"
 
 // Constants taken from pipe_loader_drm.c in Mesa
@@ -168,7 +170,15 @@ static void drv_destroy_and_close(struct driver *drv)
 		close(fd);
 }
 
-cros_gralloc_driver::cros_gralloc_driver() : drv_(init_try_nodes(), drv_destroy_and_close)
+static bool is_running_with_software_rendering()
+{
+	const char *vulkan_driver = drv_get_os_option("ro.hardware.vulkan");
+	return (vulkan_driver != nullptr && strstr(vulkan_driver, "pastel") != nullptr);
+}
+
+cros_gralloc_driver::cros_gralloc_driver()
+    : drv_(init_try_nodes(), drv_destroy_and_close),
+      is_running_with_software_rendering_(is_running_with_software_rendering())
 {
 }
 
@@ -191,6 +201,11 @@ bool cros_gralloc_driver::get_resolved_format_and_use_flags(
 	uint64_t resolved_use_flags;
 	struct combination *combo;
 	int ret = 0;
+
+	uint64_t use_flags = descriptor->use_flags;
+	if (is_running_with_software_rendering_ && (use_flags & BO_USE_GPU_HW) != 0) {
+		use_flags |= (BO_USE_SW_READ_OFTEN | BO_USE_SW_WRITE_OFTEN);
+	}
 
 	drv_resolve_format_and_use_flags(drv_.get(), descriptor->drm_format, descriptor->use_flags,
 					 &resolved_format, &resolved_use_flags);
@@ -481,6 +496,15 @@ int32_t cros_gralloc_driver::lock(buffer_handle_t handle, int32_t acquire_fence,
 	if (!hnd) {
 		ALOGE("Invalid handle.");
 		return -EINVAL;
+	}
+
+	if (!is_running_with_software_rendering_) {
+		if ((hnd->usage & (GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK)) ==
+		    0) {
+			ALOGE("Attempted to lock() a buffer that was not allocated with a "
+			      "BufferUsage::CPU_* usage.");
+			return -EINVAL;
+		}
 	}
 
 	auto buffer = get_buffer(hnd);
