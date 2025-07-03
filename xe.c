@@ -19,8 +19,8 @@
 #include "drv_priv.h"
 
 #include "external/xe_drm.h"
-#include "util.h"
 #include "intel_defines.h"
+#include "util.h"
 
 struct modifier_support_t {
 	const uint64_t *order;
@@ -39,8 +39,8 @@ struct xe_device {
 
 	uint64_t gtt_size;
 	/**
-	  * Memory vm bind alignment and buffer size requirement
-	  */
+	 * Memory vm bind alignment and buffer size requirement
+	 */
 
 	unsigned mem_alignment;
 	struct modifier_support_t modifier;
@@ -135,7 +135,7 @@ static int xe_add_combinations(struct driver *drv)
 	const uint64_t texture_only = BO_USE_TEXTURE_MASK;
 	// HW protected buffers also need to be scanned out.
 	const uint64_t hw_protected =
-		xe->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
+	    xe->has_hw_protection ? (BO_USE_PROTECTED | BO_USE_SCANOUT) : 0;
 
 	const uint64_t linear_mask = BO_USE_RENDERSCRIPT | BO_USE_LINEAR | BO_USE_SW_READ_OFTEN |
 				     BO_USE_SW_WRITE_OFTEN | BO_USE_SW_READ_RARELY |
@@ -185,6 +185,12 @@ static int xe_add_combinations(struct driver *drv)
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_GPU_DATA_BUFFER |
 				   BO_USE_SENSOR_DIRECT_DATA);
 
+	/* Android AIDL gralloc allows use of AHB-backed external memory for storage images. */
+	for (unsigned i = 0; i < ARRAY_SIZE(image_storage_formats); i++) {
+		drv_modify_combination(drv, image_storage_formats[i], &metadata_linear,
+				       BO_USE_GPU_DATA_BUFFER);
+	}
+
 	const uint64_t render_not_linear = unset_flags(render, linear_mask);
 	const uint64_t scanout_and_render_not_linear = render_not_linear | BO_USE_SCANOUT;
 	struct format_metadata metadata_x_tiled = { .tiling = XE_TILING_X,
@@ -230,7 +236,7 @@ static int xe_add_combinations(struct driver *drv)
 }
 
 static int xe_align_dimensions(struct bo *bo, uint32_t format, uint32_t tiling, uint32_t *stride,
-				 uint32_t *aligned_height)
+			       uint32_t *aligned_height)
 {
 	uint32_t horizontal_alignment = 0;
 	uint32_t vertical_alignment = 0;
@@ -301,19 +307,18 @@ static bool xe_query_config(struct driver *drv, struct xe_device *xe)
 	struct drm_xe_device_query query = {
 		.query = DRM_XE_DEVICE_QUERY_CONFIG,
 	};
-	if(drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query))
+	if (drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query))
 		return false;
 
 	struct drm_xe_query_config *config = calloc(1, query.size);
-	if(!config)
+	if (!config)
 		return false;
 
 	query.data = (uintptr_t)config;
-	if(drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query))
+	if (drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query))
 		goto data_query_failed;
 
-
-	if(config->info[DRM_XE_QUERY_CONFIG_FLAGS] & DRM_XE_QUERY_CONFIG_FLAG_HAS_VRAM)
+	if (config->info[DRM_XE_QUERY_CONFIG_FLAGS] & DRM_XE_QUERY_CONFIG_FLAG_HAS_VRAM)
 		xe->has_local_mem = true;
 	else
 		xe->has_local_mem = false;
@@ -333,7 +338,7 @@ data_query_failed:
 static bool xe_device_probe(struct driver *drv, struct xe_device *xe)
 {
 	/* Retrieve the device info by querying KMD through IOCTL
-	*/
+	 */
 	struct drm_xe_device_query query = {
 		.extensions = 0,
 		.query = DRM_XE_DEVICE_QUERY_CONFIG,
@@ -341,20 +346,21 @@ static bool xe_device_probe(struct driver *drv, struct xe_device *xe)
 		.data = 0,
 	};
 
-	if(drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query))
+	if (drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query))
 		return false;
 
 	struct drm_xe_query_config *config = calloc(1, query.size);
-	if(!config)
+	if (!config)
 		return false;
 
 	query.data = (uintptr_t)config;
-	if(drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query)){
+	if (drmIoctl(drv->fd, DRM_IOCTL_XE_DEVICE_QUERY, &query)) {
 		free(config);
 		return false;
 	}
 
-	xe->device_id = ((config->info[DRM_XE_QUERY_CONFIG_REV_AND_DEVICE_ID] << 16)>>16) & 0xFFFF;
+	xe->device_id =
+	    ((config->info[DRM_XE_QUERY_CONFIG_REV_AND_DEVICE_ID] << 16) >> 16) & 0xFFFF;
 	xe->revision = (config->info[DRM_XE_QUERY_CONFIG_REV_AND_DEVICE_ID] >> 16) & 0xFFFF;
 
 	free(config);
@@ -369,7 +375,7 @@ static int xe_init(struct driver *drv)
 	if (!xe)
 		return -ENOMEM;
 
-	if(!xe_device_probe(drv, xe)){
+	if (!xe_device_probe(drv, xe)) {
 		drv_loge("Failed to query device id using DRM_IOCTL_XE_DEVICE_QUERY");
 		return -EINVAL;
 	}
@@ -385,14 +391,14 @@ static int xe_init(struct driver *drv)
 	if (xe->graphics_version >= 12)
 		xe->has_hw_protection = 0;
 	else if (xe->graphics_version < 12) {
-		drv_loge("Xe driver is not supported on your platform: 0x%x\n",xe->device_id);
+		drv_loge("Xe driver is not supported on your platform: 0x%x\n", xe->device_id);
 		return -errno;
 	}
 
 	drv->priv = xe;
 
 	return xe_add_combinations(drv);
-return 0;
+	return 0;
 }
 
 /*
@@ -400,8 +406,7 @@ return 0;
  * to the largest coded unit (LCU) assuming that it will be used for video. This
  * is based on gmmlib's GmmIsYUVFormatLCUAligned().
  */
-static bool xe_format_needs_LCU_alignment(uint32_t format, size_t plane,
-					    const struct xe_device *xe)
+static bool xe_format_needs_LCU_alignment(uint32_t format, size_t plane, const struct xe_device *xe)
 {
 	switch (format) {
 	case DRM_FORMAT_NV12:
@@ -467,7 +472,7 @@ static size_t xe_num_planes_from_modifier(struct driver *drv, uint32_t format, u
 }
 
 static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
-				    uint64_t use_flags, const uint64_t *modifiers, uint32_t count)
+				  uint64_t use_flags, const uint64_t *modifiers, uint32_t count)
 {
 	int ret = 0;
 	uint64_t modifier;
@@ -486,6 +491,26 @@ static int xe_bo_compute_metadata(struct bo *bo, uint32_t width, uint32_t height
 			modifier = I915_FORMAT_MOD_4_TILED;
 		} else {
 			modifier = combo->metadata.modifier;
+		}
+	}
+	/*
+	 * For cursor buffer, add padding as needed to reach a known cursor-plane-supported
+	 * buffer size, as reported by the cursor capability properties.
+	 *
+	 * If the requested dimensions exceed either of the reported capabilities, or if the
+	 * capabilities couldn't be read, silently fallback by continuing without additional
+	 * padding. The buffer can still be used normally, and be committed to non-cursor
+	 * planes.
+	 */
+	if (use_flags & BO_USE_CURSOR) {
+		uint64_t cursor_width = 0;
+		uint64_t cursor_height = 0;
+		bool err = drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_WIDTH, &cursor_width) ||
+			   drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_HEIGHT, &cursor_height);
+
+		if (!err && width <= cursor_width && height <= cursor_height) {
+			width = cursor_width;
+			height = cursor_height;
 		}
 	}
 
@@ -635,10 +660,10 @@ static int xe_bo_create_from_metadata(struct bo *bo)
 	}
 
 	struct drm_xe_gem_create gem_create = {
-	     .vm_id = 0, /* ensure exportable to PRIME fd */
-	     .size = bo->meta.total_size,
-	     .flags = flags,
-	     .cpu_caching = cpu_caching,
+		.vm_id = 0, /* ensure exportable to PRIME fd */
+		.size = bo->meta.total_size,
+		.flags = flags,
+		.cpu_caching = cpu_caching,
 	};
 
 	/* FIXME: let's assume iGPU with SYSMEM is only supported */
@@ -685,8 +710,8 @@ static void *xe_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
 	/* Get the fake offset back */
 	ret = drmIoctl(bo->drv->fd, DRM_IOCTL_XE_GEM_MMAP_OFFSET, &gem_map);
 	if (ret == 0) {
-		addr = mmap(0, bo->meta.total_size, PROT_READ | PROT_WRITE,
-			    MAP_SHARED, bo->drv->fd, gem_map.offset);
+		addr = mmap(0, bo->meta.total_size, PROT_READ | PROT_WRITE, MAP_SHARED, bo->drv->fd,
+			    gem_map.offset);
 	}
 
 	if (addr == MAP_FAILED) {

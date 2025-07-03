@@ -53,10 +53,9 @@ static const uint32_t texture_source_formats[] = {
 	DRM_FORMAT_ABGR2101010, DRM_FORMAT_ABGR16161616F
 };
 
-static const uint32_t depth_stencil_formats[] = {
-	DRM_FORMAT_DEPTH16, DRM_FORMAT_DEPTH24, DRM_FORMAT_DEPTH24_STENCIL8,
-	DRM_FORMAT_DEPTH32, DRM_FORMAT_DEPTH32_STENCIL8
-};
+static const uint32_t depth_stencil_formats[] = { DRM_FORMAT_DEPTH16, DRM_FORMAT_DEPTH24,
+						  DRM_FORMAT_DEPTH24_STENCIL8, DRM_FORMAT_DEPTH32,
+						  DRM_FORMAT_DEPTH32_STENCIL8 };
 
 extern struct virtgpu_param params[];
 
@@ -421,6 +420,28 @@ static void virgl_add_combinations(struct driver *drv, const uint32_t *drm_forma
 static int virgl_2d_dumb_bo_create(struct bo *bo, uint32_t width, uint32_t height, uint32_t format,
 				   uint64_t use_flags)
 {
+	/*
+	 * For cursor buffer, add padding as needed to reach a known cursor-plane-supported
+	 * buffer size, as reported by the cursor capability properties.
+	 *
+	 * If the requested dimensions exceed either of the reported capabilities, or if the
+	 * capabilities couldn't be read, silently fallback by continuing without additional
+	 * padding. The buffer can still be used normally, and be committed to non-cursor
+	 * planes.
+	 */
+	if (bo->meta.use_flags & BO_USE_CURSOR) {
+		uint64_t cursor_width = 0;
+		uint64_t cursor_height = 0;
+		// These values are not properly set in virtio, and will return the default dimensions of 64x64.
+		bool err = drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_WIDTH, &cursor_width) ||
+			   drmGetCap(bo->drv->fd, DRM_CAP_CURSOR_HEIGHT, &cursor_height);
+
+		if (!err && width <= cursor_width && height <= cursor_height) {
+			width = cursor_width;
+			height = cursor_height;
+		}
+	}
+
 	if (bo->meta.format != DRM_FORMAT_R8) {
 		width = ALIGN(width, MESA_LLVMPIPE_TILE_SIZE);
 		height = ALIGN(height, MESA_LLVMPIPE_TILE_SIZE);
@@ -933,11 +954,6 @@ static int virgl_bo_create_blob(struct driver *drv, struct bo *bo)
 static bool should_use_blob(struct driver *drv, uint32_t format, uint64_t use_flags)
 {
 	struct virgl_priv *priv = (struct virgl_priv *)drv->priv;
-
-	// TODO(gurchetansingh): remove once all minigbm users are blob-safe
-#ifndef VIRTIO_GPU_NEXT
-	return false;
-#endif
 
 	// Only use blob when host gbm is available
 	if (!priv->host_gbm_enabled)
