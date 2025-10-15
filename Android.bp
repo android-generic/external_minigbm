@@ -47,6 +47,7 @@ filegroup {
         "i915.c",
         "mediatek.c",
         "msm.c",
+        "nouveau.c",
         "rockchip.c",
         "vc4.c",
         "virtgpu.c",
@@ -303,6 +304,19 @@ cc_library_shared {
     name: "gralloc.minigbm_msm",
     defaults: ["minigbm_cros_gralloc0_defaults"],
     shared_libs: ["libminigbm_gralloc_msm"],
+}
+
+// Nouveau
+cc_library_shared {
+    name: "libminigbm_gralloc_nouveau",
+    defaults: ["minigbm_cros_gralloc_library_defaults"],
+    cflags: ["-DDRV_NOUVEAU"],
+}
+
+cc_library_shared {
+    name: "gralloc.minigbm_nouveau",
+    defaults: ["minigbm_cros_gralloc0_defaults"],
+    shared_libs: ["libminigbm_gralloc_nouveau"],
 }
 
 // ARCVM

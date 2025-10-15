@@ -68,16 +68,7 @@ static int fd_node_num(int fd)
 	return dri_node_num(dri_node);
 }
 
-#if 0
-static int
-nouveau_getparam(int fd, uint64_t param, uint64_t *value)
-{
-   struct drm_nouveau_getparam getparam = { .param = param, .value = 0 };
-   int ret = drmCommandWriteRead(fd, DRM_NOUVEAU_GETPARAM, &getparam, sizeof(getparam));
-   *value = getparam.value;
-   return ret;
-}
-#endif
+bool nouveau_has_display(int fd);
 
 /*
  * One would wish we could read .driver_features from DRM driver.
@@ -169,7 +160,14 @@ static int detect_device_info(unsigned int detect_flags, int fd, struct gbm_devi
 		    GBM_DEV_TYPE_FLAG_DISPLAY | GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_DISCRETE;
 	} else if (strncmp("nouveau", version->name, version->name_len) == 0) {
 		info->dev_type_flags |=
-		    GBM_DEV_TYPE_FLAG_DISPLAY | GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_DISCRETE;
+            GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;
+#ifdef DRV_NOUVEAU
+        if (nouveau_has_display(fd))
+		    info->dev_type_flags |= GBM_DEV_TYPE_FLAG_DISPLAY;
+#endif
+	} else if (strncmp("tegra", version->name, version->name_len) == 0) {
+		info->dev_type_flags |=
+		    GBM_DEV_TYPE_FLAG_DISPLAY | GBM_DEV_TYPE_FLAG_ARMSOC;
 	} else if (strncmp("msm", version->name, version->name_len) == 0) {
 		info->dev_type_flags |=
 		    GBM_DEV_TYPE_FLAG_DISPLAY | GBM_DEV_TYPE_FLAG_3D | GBM_DEV_TYPE_FLAG_ARMSOC;

@@ -8,6 +8,7 @@
 #define UTIL_H
 
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
+#define MIN(A, B) ((A) < (B) ? (A) : (B))
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof(*(A)))
 #define PUBLIC __attribute__((visibility("default")))
 #define ALIGN(A, B) (((A) + (B)-1) & ~((B)-1))

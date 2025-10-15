@@ -49,6 +49,10 @@ extern const struct backend backend_xe;
 #ifdef DRV_MSM
 extern const struct backend backend_msm;
 #endif
+#ifdef DRV_NOUVEAU
+extern const struct backend backend_nouveau;
+extern const struct backend backend_tegra;
+#endif
 #ifdef DRV_VC4
 extern const struct backend backend_vc4;
 #endif
@@ -63,7 +67,6 @@ extern const struct backend backend_evdi;
 extern const struct backend backend_marvell;
 extern const struct backend backend_mediatek;
 extern const struct backend backend_meson;
-extern const struct backend backend_nouveau;
 extern const struct backend backend_komeda;
 extern const struct backend backend_radeon;
 extern const struct backend backend_rockchip;
@@ -85,6 +88,9 @@ static const struct backend *drv_backend_list[] = {
 #ifdef DRV_MSM
 	&backend_msm,
 #endif
+#ifdef DRV_NOUVEAU
+	&backend_nouveau, &backend_tegra,
+#endif
 #ifdef DRV_VC4
 	&backend_vc4,
 #endif
@@ -97,7 +103,7 @@ static const struct backend *drv_backend_list[] = {
 	&backend_virtgpu,
 #ifdef DRV_DUMB
 	&backend_evdi,	    &backend_komeda,	&backend_marvell, &backend_mediatek,
-	&backend_meson,	    &backend_nouveau,	&backend_radeon,  &backend_rockchip,
+	&backend_meson,  	&backend_radeon,  &backend_rockchip,
 	&backend_sun4i_drm, &backend_synaptics, &backend_udl,     &backend_vkms,
 	&backend_mock
 #endif
