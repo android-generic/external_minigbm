@@ -279,6 +279,24 @@ nouveau_modifier_to_tiling(uint64_t modifier)
 	return NOUVEAU_TILING(y_log2);
 }
 
+static uint64_t
+nouveau_shrink_modifier(uint64_t modifier, uint32_t height)
+{
+	if (modifier == DRM_FORMAT_MOD_LINEAR)
+		return DRM_FORMAT_MOD_LINEAR;
+
+	while (true) {
+		const uint32_t tiling = nouveau_modifier_to_tiling(modifier);
+		if (nouveau_tiling_valid(tiling, height))
+			return modifier;
+
+		assert(tiling != NOUVEAU_TILING(0));
+		modifier--;
+	}
+
+	return DRM_FORMAT_MOD_INVALID;
+}
+
 /** Returns true if a is better than b */
 static bool
 nouveau_is_modifier_better(uint64_t a_mod, uint64_t b_mod)
@@ -736,13 +754,19 @@ nouveau_bo_create(struct bo *bo, uint32_t width, uint32_t height,
 {
 	struct combination *combo = drv_get_combination(bo->drv, format, flags);
 
+	/* If we support one modifier, we support all the smaller versions
+	 * of that same modifier.  Choose the appropriate one.
+	 */
+	const uint64_t modifier =
+		nouveau_shrink_modifier(combo->metadata.modifier, height);
+
 	if (!combo) {
 		drv_loge("invalid format = %d, flags = %" PRIx64 " combination\n", format, flags);
 		return -EINVAL;
 	}
 
-	return nouveau_bo_create_for_modifier(bo, width, height, format,
-					      combo->metadata.modifier);
+	return nouveau_bo_create_for_modifier(bo, width, height,
+					      format, modifier);
 }
 
 static void *
