@@ -218,9 +218,9 @@ nouveau_tiling_tile_mode(uint32_t tiling)
 }
 
 static uint8_t
-nouveau_choose_pte_kind(const struct nouveau_device_info *devinfo)
+nouveau_choose_pte_kind(struct nouveau_device *nvdev)
 {
-	if (devinfo->chipset >= 0x14b /* Turing A */) {
+	if (nvdev->info.chipset >= 0x14b /* Turing A */) {
 		return 0x6; /* NV_MMU_PTE_KIND_GENERIC_MEMORY */
 	} else {
 		return 0xfe; /* NV_MMU_PTE_KIND_GENERIC_16BX2 */
@@ -300,7 +300,7 @@ nouveau_choose_modifier(struct driver *drv, uint32_t format, uint32_t height,
 			const uint64_t *modifiers, uint32_t modifier_count)
 {
 	struct nouveau_device *nvdev = drv->priv;
-	const uint8_t pte_kind = nouveau_choose_pte_kind(&nvdev->info);
+	const uint8_t pte_kind = nouveau_choose_pte_kind(nvdev);
 	const uint32_t cpp = drv_bytes_per_pixel_from_format(format, 0);
 
 	uint64_t best_modifier = DRM_FORMAT_MOD_INVALID;
@@ -484,7 +484,7 @@ nouveau_add_format_combinations(struct driver *drv, uint32_t format,
 				uint64_t use_flags)
 {
 	struct nouveau_device *nvdev = drv->priv;
-	const uint8_t pte_kind = nouveau_choose_pte_kind(&nvdev->info);
+	const uint8_t pte_kind = nouveau_choose_pte_kind(nvdev);
 	const uint32_t cpp = drv_bytes_per_pixel_from_format(format, 0);
 
 	for (uint32_t y_log2 = 0; y_log2 <= 5; y_log2++) {
@@ -623,7 +623,7 @@ nouveau_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
 	struct nouveau_device *nvdev = bo->drv->priv;
 
 	const uint32_t tiling = nouveau_modifier_to_tiling(modifier);
-	const uint32_t pte_kind = nouveau_choose_pte_kind(&nvdev->info);
+	const uint32_t pte_kind = nouveau_choose_pte_kind(nvdev);
 	const uint32_t tile_mode = nouveau_tiling_tile_mode(tiling);
 
 	bo->meta.tiling = tiling;
