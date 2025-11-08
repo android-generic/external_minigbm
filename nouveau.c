@@ -539,6 +539,24 @@ nv_add_combinations(struct driver *drv)
 			     ARRAY_SIZE(texture_source_formats),
 			     &LINEAR_METADATA, texture_use_flags);
 
+	/* NV12 format for camera, display, decoding and encoding. */
+	drv_modify_combination(drv, DRM_FORMAT_NV12, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE | BO_USE_SCANOUT |
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				   BO_USE_PROTECTED);
+
+	/* Android CTS tests require this. */
+	drv_add_combination(drv, DRM_FORMAT_BGR888, &LINEAR_METADATA, BO_USE_SW_MASK);
+
+	/*
+	 * R8 format is used for Android's HAL_PIXEL_FORMAT_BLOB and is used for JPEG snapshots
+	 * from camera and input/output from hardware decoder/encoder.
+	 */
+	drv_modify_combination(drv, DRM_FORMAT_R8, &LINEAR_METADATA,
+			       BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE |
+				   BO_USE_HW_VIDEO_DECODER | BO_USE_HW_VIDEO_ENCODER |
+				   BO_USE_GPU_DATA_BUFFER);
+
 	for (uint32_t i = 0; i < ARRAY_SIZE(render_target_formats); i++) {
 		nv_add_format_combinations(drv, render_target_formats[i],
 					   render_use_flags & ~sw_flags);
