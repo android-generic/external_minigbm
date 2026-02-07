@@ -653,7 +653,7 @@ nouveau_bo_create_for_modifier(struct bo *bo, uint32_t width, uint32_t height,
 	nv_calculate_layout(bo, modifier);
 
 	const uint32_t tiling = nv_modifier_to_tiling(modifier);
-	const uint32_t pte_kind = nv_choose_pte_kind(nvdev);
+	const uint32_t pte_kind = ( tiling == 0) ? 0 : nv_choose_pte_kind(nvdev);
 	const uint32_t tile_mode = nv_tiling_tile_mode(tiling);
 
 	uint32_t domain = 0;
