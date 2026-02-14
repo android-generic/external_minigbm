@@ -708,6 +708,10 @@ static int virgl_init(struct driver *drv)
 				      BO_USE_TEXTURE_MASK | BO_USE_CAMERA_READ |
 					  BO_USE_CAMERA_WRITE | BO_USE_HW_VIDEO_DECODER |
 					  BO_USE_HW_VIDEO_ENCODER | BO_USE_SCANOUT);
+		/* Enable RGB Video Decoding */
+        drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+        drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+        drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
 	} else {
 		/* Virtio primary plane only allows this format. */
 		virgl_add_combination(drv, DRM_FORMAT_XRGB8888, &LINEAR_METADATA,

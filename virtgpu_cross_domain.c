@@ -99,6 +99,11 @@ static void add_combinations(struct driver *drv)
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_SENSOR_DIRECT_DATA |
 				   BO_USE_GPU_DATA_BUFFER);
 
+	/* Enable RGB Video Decoding */
+    drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_HW_VIDEO_DECODER);
+
 	drv_modify_linear_combinations(drv);
 }
 

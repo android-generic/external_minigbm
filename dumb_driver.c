@@ -49,6 +49,11 @@ static int dumb_driver_init(struct driver *drv)
 				   BO_USE_CAMERA_READ | BO_USE_CAMERA_WRITE);
 	drv_modify_combination(drv, DRM_FORMAT_NV21, &LINEAR_METADATA, BO_USE_HW_VIDEO_ENCODER);
 
+	/* Allow RGB formats for Video Decoder (VAAPI VPP Output) */
+    drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_RGB565, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+
 	return drv_modify_linear_combinations(drv);
 }
 

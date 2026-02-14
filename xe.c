@@ -156,6 +156,11 @@ static int xe_add_combinations(struct driver *drv)
 
 	drv_modify_linear_combinations(drv);
 
+	/* Allow RGB formats for Video Decoder (VAAPI VPP Output) */
+    drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata_linear, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata_linear, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_RGB565, &metadata_linear, BO_USE_HW_VIDEO_DECODER);
+
 	/* NV12 format for camera, display, decoding and encoding. */
 	/* IPU3 camera ISP supports only NV12 output. */
 	drv_modify_combination(drv, DRM_FORMAT_NV12, &metadata_linear,

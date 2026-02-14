@@ -42,6 +42,11 @@ static int vmwgfx_init(struct driver *drv)
 			       BO_USE_SW_MASK | BO_USE_LINEAR | BO_USE_HW_VIDEO_DECODER |
 				   BO_USE_HW_VIDEO_ENCODER | BO_USE_CAMERA_READ |
 				   BO_USE_CAMERA_WRITE);
+	/* Allow RGB formats for Video Decoder (VAAPI VPP Output) */
+    drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+    drv_modify_combination(drv, DRM_FORMAT_RGB565, &LINEAR_METADATA, BO_USE_HW_VIDEO_DECODER);
+
 	drv_logi("vmwgfx minigbm inited.");
 	return drv_modify_linear_combinations(drv);
 }

@@ -429,11 +429,11 @@ static int amdgpu_init(struct driver *drv)
 	drv_add_combination(drv, DRM_FORMAT_BGR888, &metadata, BO_USE_SW_MASK);
 
 	/* Linear formats supported by display. */
-	drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
 	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_SCANOUT);
-	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_SCANOUT);
-	drv_modify_combination(drv, DRM_FORMAT_RGB565, &metadata, BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER);
+	drv_modify_combination(drv, DRM_FORMAT_RGB565, &metadata, BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER);
 
 	drv_modify_combination(drv, DRM_FORMAT_ABGR2101010, &metadata, BO_USE_SCANOUT);
 	drv_modify_combination(drv, DRM_FORMAT_ARGB2101010, &metadata, BO_USE_SCANOUT);
