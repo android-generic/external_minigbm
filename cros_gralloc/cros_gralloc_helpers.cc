@@ -120,18 +120,23 @@ uint64_t cros_gralloc_convert_usage(uint64_t usage)
 	/* HWC wants to use display hardware, but can defer to OpenGL. */
 	handle_usage(&usage, GRALLOC_USAGE_HW_COMPOSER, &use_flags,
 		     BO_USE_SCANOUT | BO_USE_TEXTURE);
+#ifdef DRMHWC_ON_VIRTGPU
+	handle_usage(&usage, GRALLOC_USAGE_HW_FB, &use_flags, BO_USE_LINEAR);
+#else
 	handle_usage(&usage, GRALLOC_USAGE_HW_FB, &use_flags, BO_USE_NONE);
+#endif
 	/*
 	 * This flag potentially covers external display for the normal drivers (i915/rockchip) and
 	 * usb monitors (evdi/udl). It's complicated so ignore it.
 	 */
 	handle_usage(&usage, GRALLOC_USAGE_EXTERNAL_DISP, &use_flags, BO_USE_NONE);
-	/* Map PROTECTED to linear until real HW protection is available on Android. */
-	handle_usage(&usage, GRALLOC_USAGE_PROTECTED, &use_flags, BO_USE_LINEAR);
+
 #if ANDROID_API_LEVEL >= 35
+	handle_usage(&usage, GRALLOC_USAGE_PROTECTED, &use_flags, BO_USE_PROTECTED);
 	handle_usage(&usage, GRALLOC_USAGE_CURSOR, &use_flags, BO_USE_CURSOR);
 #else
 	/* Legacy behavior to maintain backwards compatibility. */
+	handle_usage(&usage, GRALLOC_USAGE_PROTECTED, &use_flags, BO_USE_LINEAR);
 	handle_usage(&usage, GRALLOC_USAGE_CURSOR, &use_flags, BO_USE_NONE);
 #endif
 	/* HACK: See b/30054495 for BO_USE_SW_READ_OFTEN. */

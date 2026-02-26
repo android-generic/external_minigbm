@@ -10,6 +10,10 @@
 #include "../drv.h"
 #include "cros_gralloc_handle.h"
 
+#ifndef HAS_NO_AIDL_METADATA
+#include <aidl/android/hardware/graphics/common/BlendMode.h>
+#include <aidl/android/hardware/graphics/common/Dataspace.h>
+#endif // HAS_NO_AIDL_METADATA
 #include <log/log.h>
 #include <system/graphics.h>
 #include <system/window.h>
@@ -27,6 +31,8 @@
 #define BUFFER_USAGE_FRONT_RENDERING_MASK                                                          \
 	(BUFFER_USAGE_FRONT_RENDERING | BUFFER_USAGE_FRONT_RENDERING_PRIVATE)
 
+#define CROS_GRALLOC_BUFFER_METADATA_MAX_NAME_SIZE 1024
+
 struct cros_gralloc_buffer_descriptor {
 	uint32_t width;
 	uint32_t height;
@@ -34,8 +40,18 @@ struct cros_gralloc_buffer_descriptor {
 	int64_t droid_usage;
 	uint32_t drm_format;
 	uint64_t use_flags;
-	uint64_t reserved_region_size;
+	// If true, allocate an additional shared memory region for buffer metadata.
+	bool enable_metadata_fd = false;
+	// If the additional shared memory region for buffer metadata is present, the
+	// additional amount of space reserved for client use.
+	uint64_t client_metadata_size = 0;
 	std::string name;
+#ifndef HAS_NO_AIDL_METADATA
+	aidl::android::hardware::graphics::common::Dataspace dataspace =
+	    aidl::android::hardware::graphics::common::Dataspace::UNKNOWN;
+	aidl::android::hardware::graphics::common::BlendMode blend =
+	    aidl::android::hardware::graphics::common::BlendMode::INVALID;
+#endif // HAS_NO_AIDL_METADATA
 };
 
 constexpr uint32_t cros_gralloc_magic = 0xABCDDCBA;

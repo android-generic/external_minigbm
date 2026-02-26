@@ -1,22 +1,18 @@
-basni@chromium.org
-dawnhan@google.com
 dbehr@chromium.org
 ddavenport@chromium.org
-gurchetansingh@chromium.org
 hiroh@chromium.org
-mcasas@chromium.org
 niwa@chromium.org
 olv@google.com
 ryanneph@google.com
 tfiga@chromium.org
-zzyiwei@chromium.org
+zzyiwei@google.com
 
 # just reference for backend specific reviews
-per-file amdgpu.c = basni@chromium.org, ddavenport@chromium.org, olv@google.com
-per-file i915.c = linyaa@google.com, msturner@google.com
-per-file mediatek.c = fshao@chromium.org, hsinyi@chromium.org
+per-file amdgpu.c = ddavenport@chromium.org, olv@google.com
+per-file i915.c = justonli@google.com, ryanneph@google.com
+per-file mediatek.c = fshao@chromium.org, zzyiwei@google.com
 per-file rockchip.c = tfiga@chromium.org
-per-file virtgpu* = dawnhan@google.com, natsu@google.com, zzyiwei@chromium.org
+per-file virtgpu* = natsu@google.com, zzyiwei@google.com
 
 # Robots.
 per-file common.mk = file:chromiumos/owners:v1:/bots/OWNERS.copybara

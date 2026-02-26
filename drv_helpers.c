@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -166,10 +167,12 @@ static const struct planar_layout *layout_from_format(uint32_t format)
 	case DRM_FORMAT_XBGR8888:
 	case DRM_FORMAT_XRGB2101010:
 	case DRM_FORMAT_XRGB8888:
+	case DRM_FORMAT_GR1616:
 		return &packed_4bpp_layout;
 
 	case DRM_FORMAT_DEPTH32_STENCIL8:
 	case DRM_FORMAT_ABGR16161616F:
+	case DRM_FORMAT_AXBXGXRX106106106106:
 		return &packed_8bpp_layout;
 
 	default:
@@ -475,6 +478,22 @@ int drv_prime_bo_import(struct bo *bo, struct drv_import_fd_data *data)
 	bo->meta.tiling = data->tiling;
 
 	return 0;
+}
+
+int drv_prime_bo_export(struct bo *bo, size_t plane)
+{
+	int ret, fd;
+
+	ret = drmPrimeHandleToFD(bo->drv->fd, bo->handle.u32, DRM_CLOEXEC | DRM_RDWR, &fd);
+
+	// Older DRM implementations blocked DRM_RDWR, but gave a read/write mapping anyways
+	if (ret)
+		ret = drmPrimeHandleToFD(bo->drv->fd, bo->handle.u32, DRM_CLOEXEC, &fd);
+
+	if (ret)
+		drv_loge("Failed to get plane fd: %s\n", strerror(errno));
+
+	return (ret) ? ret : fd;
 }
 
 void *drv_dumb_bo_map(struct bo *bo, struct vma *vma, uint32_t map_flags)
