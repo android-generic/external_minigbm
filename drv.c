@@ -716,6 +716,7 @@ union bo_handle drv_bo_get_plane_handle(struct bo *bo, size_t plane)
 
 int drv_bo_get_plane_fd(struct bo *bo, size_t plane)
 {
+	int fd;
 	assert(plane < bo->meta.num_planes);
 
 	if (bo->is_test_buffer)

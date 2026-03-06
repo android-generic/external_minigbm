@@ -228,6 +228,7 @@ const struct backend backend_vmwgfx = {
 	.bo_create = vmwgfx_bo_create,
 	.bo_create_with_modifiers = vmwgfx_bo_create_with_modifiers,
 	.bo_import = drv_prime_bo_import,
+	.bo_export = drv_prime_bo_export,
 	.bo_destroy = vmwgfx_bo_destroy,
 	.bo_map = vmwgfx_bo_map,
 	.bo_unmap = drv_bo_munmap,
