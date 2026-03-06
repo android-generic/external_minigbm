@@ -1181,6 +1181,10 @@ android::hardware::graphics::mapper::V4_0::IMapper* HIDL_FETCH_IMapper(const cha
         if (strcmp(default_gralloc, "minigbm_arcvm") == 0) {
     return static_cast<android::hardware::graphics::mapper::V4_0::IMapper*>(new CrosGralloc4Mapper);
     } else {return NULL;}
+#elif defined(DRV_NOUVEAU)
+        if (strcmp(default_gralloc, "minigbm_nouveau") == 0) {
+    return static_cast<android::hardware::graphics::mapper::V4_0::IMapper*>(new CrosGralloc4Mapper);
+    } else {return NULL;}
 #elif defined(DRV_EXTERNAL)
         if (strcmp(default_gralloc, "minigbm_gbm_mesa") == 0) {
     return static_cast<android::hardware::graphics::mapper::V4_0::IMapper*>(new CrosGralloc4Mapper);
