@@ -145,6 +145,10 @@ cc_defaults {
     defaults: ["minigbm_cros_gralloc_defaults"],
     relative_install_path: "hw",
 
+    cflags: [
+        "-DHAS_NO_AIDL_METADATA",
+    ],
+
     srcs: [":minigbm_gralloc0_files"],
 }
 
