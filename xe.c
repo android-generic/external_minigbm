@@ -80,6 +80,14 @@ static void xe_info_from_device_id(struct xe_device *xe)
 		}
 	}
 
+	for (i = 0; i < ARRAY_SIZE(arl_ids); i++) {
+		if (arl_ids[i] == xe->device_id) {
+			xe->graphics_version = 12;
+			xe->is_mtl_or_newer = true;
+			return;
+		}
+	}
+
 	for (i = 0; i < ARRAY_SIZE(lnl_ids); i++) {
 		if (lnl_ids[i] == xe->device_id) {
 			xe->graphics_version = 20;

@@ -126,6 +126,7 @@ static void i915_info_from_device_id(struct i915_device *i915)
 				      0xA7A9, 0xA7AA, 0xA7AB, 0xA7AC, 0xA7AD };
 
 	const uint16_t mtl_ids[] = { 0x7D40, 0x7D60, 0x7D45, 0x7D55, 0x7DD5 };
+	const uint16_t arl_ids[] = { 0x7D41, 0x7D51, 0x7D67, 0x7DD1, 0xB640 };
 
 	unsigned i;
 	i915->graphics_version = 4;
@@ -190,6 +191,12 @@ static void i915_info_from_device_id(struct i915_device *i915)
 
 	for (i = 0; i < ARRAY_SIZE(mtl_ids); i++)
 		if (mtl_ids[i] == i915->device_id) {
+			i915->graphics_version = 12;
+			i915->is_mtl = true;
+		}
+
+	for (i = 0; i < ARRAY_SIZE(arl_ids); i++)
+		if (arl_ids[i] == i915->device_id) {
 			i915->graphics_version = 12;
 			i915->is_mtl = true;
 		}
