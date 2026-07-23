@@ -328,6 +328,8 @@ static bool is_modifier_scanout_capable(struct amdgpu_priv *priv, uint32_t forma
 		return false;
 
 	unsigned swizzle = AMD_FMT_MOD_GET(TILE, modifier);
+	bool is_gfx10_plus = AMD_FMT_MOD_GET(TILE_VERSION, modifier) >= AMD_FMT_MOD_TILE_VER_GFX10;
+
 	if (priv->dev_info.family >= AMDGPU_FAMILY_RV) { /* DCN based GPUs */
 		/* D swizzle only supported for 64 bpp */
 		if ((swizzle & 3) == 2 && bytes_per_pixel != 8)
@@ -336,6 +338,10 @@ static bool is_modifier_scanout_capable(struct amdgpu_priv *priv, uint32_t forma
 		/* S swizzle not supported for 64 bpp */
 		if ((swizzle & 3) == 1 && bytes_per_pixel == 8)
 			return false;
+
+		/* S swizzle not supported for scanout on GFX10.3 and later (RDNA2+) */
+		if ((swizzle & 3) == 1 && AMD_FMT_MOD_GET(TILE_VERSION, modifier) >= AMD_FMT_MOD_TILE_VER_GFX10_RBPLUS)
+			return false;
 	} else { /* DCE based GPUs with GFX9 based modifier swizzling. */
 		assert(priv->dev_info.family == AMDGPU_FAMILY_AI);
 		/* Only D swizzles are allowed for display */
@@ -343,7 +349,7 @@ static bool is_modifier_scanout_capable(struct amdgpu_priv *priv, uint32_t forma
 			return false;
 	}
 
-	if (AMD_FMT_MOD_GET(DCC, modifier) &&
+	if (AMD_FMT_MOD_GET(DCC, modifier) && !is_gfx10_plus &&
 	    (AMD_FMT_MOD_GET(DCC_PIPE_ALIGN, modifier) || !AMD_FMT_MOD_GET(DCC_RETILE, modifier)))
 		return false;
 	return true;
@@ -431,8 +437,8 @@ static int amdgpu_init(struct driver *drv)
 	/* Linear formats supported by display. */
 	drv_modify_combination(drv, DRM_FORMAT_ARGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_XRGB8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
-	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_SCANOUT);
-	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER);
+	drv_modify_combination(drv, DRM_FORMAT_ABGR8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT);
+	drv_modify_combination(drv, DRM_FORMAT_XBGR8888, &metadata, BO_USE_CURSOR | BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER);
 	drv_modify_combination(drv, DRM_FORMAT_RGB565, &metadata, BO_USE_SCANOUT | BO_USE_HW_VIDEO_DECODER);
 
 	drv_modify_combination(drv, DRM_FORMAT_ABGR2101010, &metadata, BO_USE_SCANOUT);
@@ -605,6 +611,9 @@ static int amdgpu_create_bo_linear(struct bo *bo, uint32_t width, uint32_t heigh
 		gem_create.in.domain_flags |= AMDGPU_GEM_CREATE_CPU_ACCESS_REQUIRED;
 
 	gem_create.in.domains = AMDGPU_GEM_DOMAIN_GTT;
+
+	if (use_flags & BO_USE_CURSOR)
+		gem_create.in.domains |= AMDGPU_GEM_DOMAIN_VRAM;
 
 	/* Scanout in GTT requires USWC, otherwise try to use cachable memory
 	 * for buffers that are read often, because uncacheable reads can be
@@ -864,13 +873,8 @@ static void amdgpu_resolve_format_and_use_flags(struct driver *drv, uint32_t for
 {
 	drv_resolve_format_and_use_flags_helper(drv, format, use_flags, out_format, out_use_flags);
 
-	// TODO(b/404428779): BO_USE_CURSOR should not be set with formats that don't support it.
-	// Remove this check once it is safe to do so.
-	if ((*out_use_flags & BO_USE_CURSOR) &&
-	    !drv_get_combination(drv, *out_format, *out_use_flags)) {
-		drv_logi("Ignoring BO_USE_CURSOR flag with unsupported format %u\n", *out_format);
-		*out_use_flags &= ~BO_USE_CURSOR;
-	}
+	// BO_USE_CURSOR should not be stripped, as drm_hwcomposer relies on it to enforce LINEAR layout
+	// on overlay fallback planes if the hardware cursor plane rejects the format.
 }
 
 const struct backend backend_amdgpu = {
